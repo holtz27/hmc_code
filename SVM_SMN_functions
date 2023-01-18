@@ -1,5 +1,5 @@
 ########################## theta = (mu, phi, sigma) #########################
-######## Transformação: T(theta) = theta                         ############  
+######## Transformação: T(theta) = theta'                         ############  
 ######## theta' = (mu, arctanh(phi), log(sigma)) = (mu, w, gama) ############
 logpost_theta = function(theta, param){
   #theta = (mu, w, gama)
@@ -204,3 +204,87 @@ glogpost_h = function(h, param){
   return( matrix(s - r, ncol = 1) )
 }
 
+#############################################################################
+########################## l | v ~ Gama(v/2, v/2)
+
+########### l_t | y, b, h, v ~ Gama( a_t, b_t ), 1 < t < T
+# a_t = (v + 1)/2
+# b_t =  ( exp(-h_t)(y_t - b0 - b1y_{t-1} - b2exp{h_t})**2 + v )/2
+
+########################## v.1
+######## Transformação: T(v) = e                         ############
+######## e = log(v)
+logpost_v.1 = function(e, param){
+  #param = (l, a_v, b_v)
+  v = exp(e)
+  l = as.vector(param$l)
+  T = length(T)
+  
+  L = 0.5 * T * v * log( 0.5 * v  ) - T * log( gamma( 0.5 * v )  )
+  L = L + 0.5 * v * sum( log(l) - l )
+  # priori
+  L = L + param$a_v * log(v) - param$b_v * v
+  
+  return( as.numeric(L) )
+}
+glogpost_v.1 = function(e, param){
+  #param = (l, a_v, b_v)
+  v = exp(e)
+  l = as.vector(param$l)
+  T = length(T)
+  
+  grad = 0.5 * T * v * log(0.5 * v) - 0.5 * T * v * digamma( 0.5 * v)
+  grad = grad + 0.5 * v * sum( log(l) - l ) 
+  grad = grad + param$a_v - param$b_v * v + 0.5 * T * v
+  
+  return( as.numeric(grad) )
+}
+
+#############################################################################
+########################## l | v ~ Beta(v, 1)
+
+# l_t | y, b, h, v ~ Gama_truncada_{0 < l_t < 1}( a_t, b_t ), 1 < t < T
+# a_t = v + 1/2
+# b_t =  ( exp(-h_t)(y_t - b0 - b1 * y_{t-1} - b2 * exp{h_t})**2 )/2
+
+########################## v.2
+# v.2 | l_t ~ Gama_truncada_{1 < v}( a_t, b_t )
+# a_t = T + a_v
+# b_t = b_v - sum( log(l)  )
+
+#############################################################################
+########################## l | v ~ IGama(v/2, v/2)
+
+########### l_t | y, b, h, v ~ GIGauss( a_t, b_t, p_t ), 1 < t < T
+# a_t = (1 - v)/2
+# b_t =  ( exp(-h_t)(y_t - b0 - b1 * y_{t-1} - b2 * exp{h_t})**2 )/2
+# p_t = v
+
+########################## v.3
+######## Transformação: T(v) = e                         ############
+######## e = log(v)
+logpost_v.3 = function(e, param){
+  #param = (l, a_v, b_v)
+  v = exp(e)
+  l = as.vector(param$l)
+  T = length(T)
+  
+  L = 0.5 * T * v * log( 0.5 * v ) - T * log( gamma(0.5 * v) )
+  L = L - 0.5 * v * sum(log(l) - 1/l)
+  # priori
+  L = L + param$a_v * log(v) - param$b_v * v
+  
+  return( as.numeric(L) )
+}
+glogpost_v.3 = function(e, param){
+  #param = (l, a_v, b_v)
+  v = exp(e)
+  l = as.vector(param$l)
+  T = length(T)
+  
+  grad = 0.5 * T * v * log( 0.5 * v ) + 0.5 * T * v
+  grad = grad - 0.5 * T * v * digamma( 0.5 * v ) - 0.5 * v * sum(log(l) - 1/l)
+  grad = grad + param$a_v - param$b_v * v
+  
+  return( as.numeric(grad) )
+}
