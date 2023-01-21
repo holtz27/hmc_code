@@ -95,10 +95,10 @@ glf = function(eps, L, theta_current, p_current, fixed_p, param){
   
   return(Proposal)
 }
-rmhmc_R = function(N, eps, min_L, max_L, theta_init, param, fixed_p, seed){
+rmhmc_R = function(N, eps, min_L, max_L, theta_init, param, fixed_p, seed = NULL){
   
-  set.seed(seed)
-  
+  if ( !is.null(seed) ) set.seed(seed)
+  time.init = Sys.time()
   acc = 0;
   theta_current = matrix(theta_init, ncol = 1)
   r = nrow(theta_current)
@@ -130,6 +130,6 @@ rmhmc_R = function(N, eps, min_L, max_L, theta_init, param, fixed_p, seed){
       chain[, i] = theta_current
     }
   }
-  
-  return(list("chain" = chain, "acc" = acc))
+  time.final = Sys.time()
+  return(list("chain" = chain, "acc" = acc, "time" = time.final - time.init))
 }
