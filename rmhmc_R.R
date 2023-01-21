@@ -34,9 +34,11 @@ d_G_sigma2 = function(theta, param){
 ########################## Algoritmo
 
 H = function(p, theta, param){
-  p = matrix(p, nrow = 1)
+  p = matrix(p, ncol = 1)
   x = - logpost(theta, param) 
-  x = x + mvtnorm::dmvnorm(p, sigma = G(theta, param), log = TRUE)  
+  x = x + 0.5 * log( det( G(theta, param) ) )  
+  x = x + 0.5 *  t(p) %*% solve( G(theta, param) ) %*% p 
+ 
  return(x)
 }
 d_H_theta = function(p, theta, param){
