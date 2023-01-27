@@ -220,8 +220,7 @@ G_b = function(b, param){
   
   #2a col
   m12 = m21
-  m22 = (1 - b1**2)**2 * sum( l * exp( -h ) * y[1:T]**2 )
-  + (1 - b1**2) * (param$a_b1 + param$b_b1)
+  m22 = (1 - b1**2)**2 * sum( l * exp( -h ) * y[1:T]**2 ) + (1 - b1**2) * (param$a_b1 + param$b_b1)
   m32 = (1 - b1**2) * sum( l * y[1:T] )
   
   #3a col
@@ -327,6 +326,31 @@ glogpost_h = function(h, param){
   
   return( matrix(s - r, ncol = 1) )
 }
+G_h = function(h, param){
+  #h = (h1, ..., hT)
+  #param = (y, l, theta, b)
+  
+  y = as.vector(param$y)
+  l = as.vector(param$l)
+  
+  theta = as.vector(param$theta)
+  mu = theta[1]
+  phi = tanh(theta[2])
+  sigma = exp(theta[3])
+  
+  b = as.vector(param$b)
+  b0 = b[1]
+  b1 = b[2]
+  b2 = b[3]
+  
+  T = length(h)
+  
+  G = b2**2 * diag( 0.5 + 1/sigma**2 + l * exp(h) )
+  G[abs(row(G) - col(G)) == 1] = ( - phi/sigma**2 )
+  
+  return( G )
+}
+# dG_h_ht = diag(0, ..., 0, b2² * l[t] * exp( h[t] ), 0, ..., 0)
 #############################################################################
 ########################## l | v ~ Gama(v/2, v/2)
 
