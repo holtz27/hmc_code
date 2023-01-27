@@ -79,6 +79,71 @@ vec glogpost_theta(vec theta, List param){
   
   return grad;
 }
+mat G_theta(vec theta, List param){
+  // theta = (mu, w, gama)
+  // param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
+  double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
+    s_0 = param["s_0"], a_phi = param["a_phi"], b_phi = param["b_phi"], 
+                b_s = param["b_s"];
+  
+  vec h = param["h"];
+  int T = h.n_elem;
+  mat G(3, 3, fill::zeros);
+  
+  //1acol
+  G(0, 0) = ( (1 - pow(phi, 2) ) 
+                + (T - 1) * pow(1 - phi, 2) ) * pow(sigma, -2) + pow(s_0, -2);
+  //G(1, 0) = G(2, 0) = 0;
+  
+  //#2a col
+  //G(0, 1) = 0;
+  G(1, 1) = 2 * pow(phi, 2) + (1 - pow(phi, 2) ) * (T - 1 + a_phi + b_phi);
+  G(2, 1) = 2 * phi;
+  
+  //3a col
+  G(0, 2) = G(2, 0);
+  G(1, 2) = G(2, 1);
+  G(2, 2) = 2 * T + 4 * b_s * pow(sigma, -2);
+  
+  return G;
+}
+mat dG_theta_mu(vec theta, List param){
+  mat dG(3, 3, fill::zeros);
+  return dG;
+}
+mat dG_theta_phi(vec theta, List param){
+  // theta = (mu, w, gama)
+  // param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
+  double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
+    s_0 = param["s_0"], a_phi = param["a_phi"], b_phi = param["b_phi"], 
+                b_s = param["b_s"];
+  
+  vec h = param["h"];
+  int T = h.n_elem;
+  mat dG(3, 3, fill::zeros);
+  
+  dG(0, 0) = -2 * (1 - pow(phi, 2) ) * (phi + (T - 1) * (1 - phi) ) * pow(sigma, -2);
+  dG(1 ,1) = 2 * phi * (1 - pow(phi, 2) ) * (2 - (T-1) - a_phi - b_phi );
+  dG(1, 2) = 2 * (1 - phi);
+  dG(2, 1) = dG(1, 2);
+  
+  return dG;
+}
+mat dG_theta_sigma(vec theta, List param){
+  // theta = (mu, w, gama)
+  // param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
+  double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
+    b_s = param["b_s"];
+  
+  vec h = param["h"];
+  int T = h.n_elem;
+  mat dG(3, 3, fill::zeros);
+  
+  dG(0, 0) = -2 * (1 - pow(phi, 2) + (T-1) * pow(1 - phi, 2) ) * pow(sigma, -2);
+  dG(2, 2) = -8 * b_s * pow(sigma, -2);
+  
+  return dG;
+}
 //########################## h
 double logpost_h(vec h, List param){
   //#h = (h1, ..., hT)
@@ -189,5 +254,70 @@ vec glogpost_b(vec b, List param){
   grad[2] = dot(l, z) - (b2 - mu_b2) * pow(s_b2, -2);
   
   return grad;
+}
+mat G_b(vec b, List param){
+  //b = (b0, delta, b2)
+  //param = (y, h, l, mu_b0, s_b0, a_b1, b_b1, mu_b2, s_b2)
+  //y = (y0. y1, ..., yT)
+  
+  double b0 = b[0], b1 = tanh(b[1]), b2 = b[2], s_b0 = param["s_b0"], 
+         a_b1 = param["a_b1"], b_b1 = param["b_b1"], s_b2 = param["s_b2"];
+  
+  vec y = param["y"], h = param["h"], l = param["l"];
+  int T = h.n_elem;
+  
+  mat G(3, 3, fill::zeros);
+  
+  //1a col
+  G(0, 0) = sum( l % exp( -h ) ) + pow(s_b0, -2);
+  G(1, 0) = (1 - pow(b1, 2) ) * sum( l % exp( -h ) % y.subvec(0, T-1) );
+  G(2, 0) = sum( l );
+  
+  //2a col
+  G(0, 1) = G(1, 0);
+  G(1, 1) = pow(1 - pow(b1, 2), 2) * sum( l % exp( -h ) % pow(y.subvec(0, T-1), 2) ) 
+    + ( 1 - pow(b1, 2) ) * (a_b1 + b_b1);
+  G(2, 1) = (1 - pow(b1, 2) ) * sum( l % y.subvec(0, T-1) );
+    
+  //3a col
+  G(0, 2) = G(2, 0);
+  G(1, 2) = G(2, 1);
+  G(2, 2) = sum( l % exp( h ) ) + pow(s_b2, -2);
+  
+  return G;
+}
+mat dG_b_b0(vec b, List param){
+  mat dG(3, 3, fill::zeros);
+  return dG;
+}
+mat DG_b_b1(vec b, List param){
+  //b = (b0, delta, b2)
+  //param = (y, h, l, mu_b0, s_b0, a_b1, b_b1, mu_b2, s_b2)
+  //y = (y0. y1, ..., yT)
+  
+  double b0 = b[0], b1 = tanh(b[1]), b2 = b[2], s_b0 = param["s_b0"], 
+                                                            a_b1 = param["a_b1"], b_b1 = param["b_b1"], s_b2 = param["s_b2"];
+  
+  vec y = param["y"], h = param["h"], l = param["l"];
+  int T = h.n_elem;
+  
+  mat dG(3, 3, fill::zeros);
+  
+  //1a col
+  dG(1, 0) = -2 * b1 * (1 - pow(b1, 2) ) * sum( l % exp( -h ) % y.subvec(0, T-1) );
+  
+  //2a col
+  dG(0, 1) = dG(1, 0);
+  dG(1, 1) = -2 * b1 * (1 - pow(b1, 2) ) * ( 2 * (1 - pow(b1, 2) ) * sum( l % exp( -h ) % pow(y.subvec(0, T-1), 2) ) - a_b1 - b_b1 );
+  dG(2, 1) = -2 * b1 * (1 - pow(b1, 2) ) * sum( l % y.subvec(0, T-1) );   
+  
+  //3a col
+  dG(1, 2) = dG(2, 1);
+  
+  return dG;
+}
+mat dG_b_b2(vec b, List param){
+  mat dG(3, 3, fill::zeros);
+  return dG;
 }
 // [[Rcpp::export]]
