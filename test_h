@@ -140,3 +140,26 @@ List hmc(int N, double eps, int min_L, int max_L, vec theta_init, List param){
  return out;
   
 }
+######################################################################################
+path = 'Área de Trabalho/Mestrado/Projeto/Projeto II/Simulação/hmc/h_hmc.cpp'
+Rcpp::sourceCpp(path)
+
+N = 3e4
+z = hmc(N, eps = 0.015, min_L = 50, max_L = 80,
+        theta_init = rep(0, T),
+        param = list(y = c(y0, y),
+                     l = l, 
+                     theta = c(mu, phi, sigma), 
+                     b = c(b0, b1, b2) )
+        )
+
+z$acc/N
+z$time
+
+chain = unlist(z$chain)
+sum( is.na(chain) )
+
+
+plot(chain[10, ], type = "l")
+abline(h = h[10])
+acf(chain[10, ])
