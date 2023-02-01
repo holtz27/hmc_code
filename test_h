@@ -159,7 +159,20 @@ z$time
 chain = unlist(z$chain)
 sum( is.na(chain) )
 
+####################### Visualization
+chain = chain[, 2:(T+1)]
+h_hat = apply(chain, MARGIN = 2, FUN = mean)
+h_min = apply(chain, MARGIN = 2, FUN = quantile, probs = c(0.05) )
+h_max = apply(chain, MARGIN = 2, FUN = quantile, probs = c(0.975) )
+data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
+data = data.frame(data)
+names(data) = c('obs', 'vdd','media', 'min','max')
+data
 
-plot(chain[10, ], type = "l")
-abline(h = h[10])
-acf(chain[10, ])
+library(ggplot2)
+g = ggplot(data) 
+g = g + geom_line(aes(obs, media))
+g = g + geom_line(aes(obs, vdd), color = 'red')
+g = g + geom_line(aes(obs, min), linetype = 'dashed')
+g = g + geom_line(aes(obs, max), linetype = 'dashed')
+g
