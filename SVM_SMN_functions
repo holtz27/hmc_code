@@ -357,7 +357,19 @@ G_h = function(h, param){
 ########### l_t | y, b, h, v ~ Gama( a_t, b_t ), 1 < t < T
 # a_t = (v + 1)/2
 # b_t =  ( exp(-h_t)(y_t - b0 - b1y_{t-1} - b2exp{h_t})**2 + v )/2
-
+l_gibbs = function(param){
+  #param = (y, b, v, h)
+  y = as.vector(param$y)
+  b = as.vector(param$b)
+  v = param$v
+  h = as.vector(param$h)
+  T = length(h)
+  u = exp(-h) * ( y[2:(T+1)] - b[1] - b[2] * y[1:T] - b[3] * exp(h) )**2
+  
+  l = rgamma( T, shape = 0.5 * (v + 1), rate = 0.5 * (u + v) )
+  
+  return( as.vector(l) )
+}
 ########################## v.1
 ######## Transformação: T(v) = e                         ############
 ######## e = log(v)
@@ -365,7 +377,7 @@ logpost_v.1 = function(e, param){
   #param = (l, a_v, b_v)
   v = exp(e)
   l = as.vector(param$l)
-  T = length(T)
+  T = length(l)
   
   L = 0.5 * T * v * log( 0.5 * v  ) - T * log( gamma( 0.5 * v )  )
   L = L + 0.5 * v * sum( log(l) - l )
@@ -378,7 +390,7 @@ glogpost_v.1 = function(e, param){
   #param = (l, a_v, b_v)
   v = exp(e)
   l = as.vector(param$l)
-  T = length(T)
+  T = length(l)
   
   grad = 0.5 * T * v * log(0.5 * v) - 0.5 * T * v * digamma( 0.5 * v)
   grad = grad + 0.5 * v * sum( log(l) - l ) 
@@ -386,7 +398,26 @@ glogpost_v.1 = function(e, param){
   
   return( as.numeric(grad) )
 }
-
+G_v.1 = function(e, param){
+  #param = (l, a_v, b_v)
+  v = exp(e)
+  l = as.vector(param$l)
+  T = length(l)
+  
+  G = T * v**2 * psigamma(0.5 * v, 1) /4 - v * ( param$b_v - 0.5 * T )
+  
+  return( G )
+}
+dG_v.1 = function(e, param){
+  #param = (l, a_v, b_v)
+  v = exp(e)
+  l = as.vector(param$l)
+  T = length(l)
+  
+  dG = 0.5 * T * v**2 * psigamma(0.5 * v, 1) + T * v**3 * psigamma(0.5 * v, 2)/8 - 0.5 * T - param$b_v
+  
+  return( dG )
+}
 #############################################################################
 ########################## l | v ~ Beta(v, 1)
 
