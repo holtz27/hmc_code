@@ -703,15 +703,12 @@ h_init = rep( 0, length(y) )
 l_init = rep(1, length(y) )
 e_init = log( 2 )
 
-N = 1e3
-
-chain. = matrix(0, nrow = 2 * length(y) + 7, ncol = N + 1)
-chain.[, 1] = c( theta_init,
-                 b_init,
-                 h_init,
-                 l_init,
-                 e_init )
-
+#chain. = matrix(0, nrow = 2 * length(y) + 7, ncol = N + 1)
+init = c( theta_init,
+          b_init,
+          h_init,
+          l_init,
+          e_init )
 
 param = list(y_T = c(y0, y),
              theta = theta_init,
@@ -726,13 +723,13 @@ param = list(y_T = c(y0, y),
              a_b1 = 5, b_b1 = 1.5, 
              mu_b2 = 0, s_b2 = 10,
              a_v = 2, b_v = 2)
-
+N = 1e1
 x = svm_smn(N, 
-            eps_theta = c(0.01, 0.01, 0.01), 
-            eps_b = c(0.1, 0.1, 0.1),
-            eps_h = 0.01,
-            eps_e = 0.01,
-            chain., 
+            eps_theta = c(0.01, 0.01, 0.01), min_L_theta = 10, max_L_theta = 80,
+            eps_b = c(0.1, 0.1, 0.1), min_L_b = 10, max_L_b = 80,
+            eps_h = 0.01, min_L_h = 10, max_L_h = 80,
+            eps_e = 0.01, min_L_e = 10, max_L_e = 80,
+            init = init, 
             param)
 
 x$acc / N
