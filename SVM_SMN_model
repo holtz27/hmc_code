@@ -25,7 +25,7 @@ for(t in 1:T){
   }else{
     l[t] = rgamma(1, shape = v/2, rate = v/2)
     h[t] = rnorm(1, mean = (mu + phi*(h[t-1]-mu)), sd = sigma)
-    y[t] = rnorm(1, b0 + b1* y [t-1] + b2*exp(h[t]), exp(h[t]/2)*sqrt([t]))
+    y[t] = rnorm(1, b0 + b1* y [t-1] + b2*exp(h[t]), exp(h[t]/2)*sqrt(l[t]))
   }
 }
 
