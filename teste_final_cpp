@@ -597,8 +597,11 @@ List rmhmc(int N, vec eps, int min_L, int max_L, vec theta_init, List param,
   return( List::create(Named("chain") = chain, Named("acc") = acc, Named("time") = time) );
 }
 // [[Rcpp::export]]
-List svm_smn(int N, vec eps_theta, vec eps_b, double eps_h, vec eps_e,
-             mat chain, List param){
+List svm_smn(int N, vec eps_theta, int min_L_theta, int max_L_theta,
+             vec eps_b, int min_L_b, int max_L_b,
+             double eps_h, int min_L_h, int max_L_h, 
+             vec eps_e, int min_L_e, int max_L_e,
+             vec init, List param, int fixed_p = 5){
   
   wall_clock timer;
   timer.tic();
@@ -607,16 +610,20 @@ List svm_smn(int N, vec eps_theta, vec eps_b, double eps_h, vec eps_e,
     v_b[3] = {&dG_b_b0, &dG_b_b1, &dG_b_b2}, v_e[1] = { &dG_v_1 };
   
   vec acc(5, fill::zeros), y_T = param["y_T"]; 
-  int z_acc, T = y_T.n_elem, a = floor(0.1*N);
+  int z_acc, T = y_T.n_elem, a = floor(0.1 * N);
   List z;
+  
+  // iniciando a cadeia
+  mat chain(2 * T + 5, N + 1, fill::zeros);
+  chain.col(0) += init;
   
   for( int it = 1; it <= N; it++ ){
     
     // (i) theta
-    z = rmhmc(1, eps_theta, 10, 80, 
+    z = rmhmc(1, eps_theta, min_L_theta, max_L_theta, 
               chain.col(it - 1).subvec(0, 2),
               param, 
-              5,  
+              fixed_p,  
               &logpost_theta, &glogpost_theta, &G_theta, v_theta);
     
     mat pivot_1 = z["chain"];
@@ -628,10 +635,10 @@ List svm_smn(int N, vec eps_theta, vec eps_b, double eps_h, vec eps_e,
     param["theta"] = chain.col( it ).subvec( 0, 2 );
     
     // (ii) b
-    z = rmhmc(1, eps_b, 10, 80, 
+    z = rmhmc(1, eps_b, min_L_b, max_L_b, 
               chain.col(it - 1).subvec(3, 5), 
               param, 
-              5,  
+              fixed_p,  
               &logpost_b, &glogpost_b, &G_b, v_b);
     mat pivot_2 = z["chain"];
     z_acc =  z["acc"];
@@ -643,7 +650,7 @@ List svm_smn(int N, vec eps_theta, vec eps_b, double eps_h, vec eps_e,
     
     
     // (iii) h
-    z = hmc(1, eps_h, 10, 80, 
+    z = hmc(1, eps_h, min_L_h, max_L_h, 
             chain.col(it - 1).subvec( 6, T + 4 ), 
             param,
             &logpost_h, &glogpost_h);
@@ -663,11 +670,10 @@ List svm_smn(int N, vec eps_theta, vec eps_b, double eps_h, vec eps_e,
     param["l"] = chain.col( it ).subvec( T + 5, 2 * T + 3 );
      
     // (v) e
-    
-    z = rmhmc(1, eps_e, 10, 80, 
+    z = rmhmc(1, eps_e, min_L_e, max_L_e, 
               chain.col(it - 1).tail( 1 ), 
               param, 
-              5,  
+              fixed_p,  
               &logpost_v_1, &glogpost_v_1, &G_v_1, v_e);
     mat pivot_4 = z["chain"];
     z_acc =  z["acc"];
@@ -678,13 +684,14 @@ List svm_smn(int N, vec eps_theta, vec eps_b, double eps_h, vec eps_e,
     param["e"] = chain.col( it ).tail( 1 );
     
     //Progress bar
-    //if( (it % a) == 0 ) cout << "Progresso em " << ceil(100 * it / N)<<" %"<< endl;
+    if( (it % a) == 0 ) cout << "Progresso em " << ceil(100 * it / N)<<" %"<< endl;
   }
   
   double time = timer.toc();
   
   return List::create( Named("chain") = chain, Named("acc") = acc, Named("time") = time );
 }
+
 ################################################################################################
 path = 'Área de Trabalho/Mestrado/Projeto/Projeto II/Simulação/test_final_cpp.cpp'
 Rcpp::sourceCpp(path)
