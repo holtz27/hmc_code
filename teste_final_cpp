@@ -747,6 +747,7 @@ chain[2 * T + 7, ] = exp( chain[2 * T + 7, ] )
 ### burn
 burn = 100
 burned = as.matrix(chain[, -c(1:burn)])
+
 ###### theta
 par(mfrow = c(2, 2))
 plot(burned[1, ], type = 'l', main = 'mu')
@@ -756,6 +757,7 @@ plot(acf(burned[2, ], lag.max = 100, plot = FALSE)[1:100])
 plot(burned[3, ], type = 'l', main = 'sigma')
 plot(acf(burned[3, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
+
 ###### b
 par(mfrow = c(2, 2))
 plot(burned[4, ], type = 'l', main = 'b0')
@@ -765,11 +767,13 @@ plot(acf(burned[5, ], lag.max = 100, plot = FALSE)[1:100])
 plot(burned[6, ], type = 'l', main = 'b2')
 plot(acf(burned[6, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
+
 ###### v
 par(mfrow = c(1, 2))
 plot(burned[2 * T + 7, ], type = 'l', main = 'v')
 plot(acf(burned[2 * T + 7, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
+
 ###### h
 X = burned[7:(T + 6), ]
 h_hat = apply(X, MARGIN = 1, FUN = mean)
@@ -785,3 +789,19 @@ g = g + geom_line(aes(obs, vdd), color = 'red')
 g = g + geom_line(aes(obs, min), linetype = 'dashed')
 g = g + geom_line(aes(obs, max), linetype = 'dashed')
 g
+
+###### l
+Y = burned[(T + 7):(2*T + 6), ]
+l_hat = apply(Y, MARGIN = 1, FUN = mean)
+l_min = apply(Y, MARGIN = 1, FUN = quantile, probs = c(0.05) )
+l_max = apply(Y, MARGIN = 1, FUN = quantile, probs = c(0.975) )
+data2 = matrix(c(1:T, l, l_hat, l_min, l_max), ncol = 5)
+data2 = data.frame(data2)
+names(data2) = c('obs', 'vdd', 'media', 'min', 'max')
+# plot1
+f1 = ggplot(data2) 
+f1 = f1 + geom_line(aes(obs, media))
+f1 = f1 + geom_line(aes(obs, vdd), color = 'red')
+f1 = f1 + geom_line(aes(obs, min), linetype = 'dashed')
+f1 = f1 + geom_line(aes(obs, max), linetype = 'dashed')
+f1
