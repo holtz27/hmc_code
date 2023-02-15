@@ -734,3 +734,54 @@ x = svm_smn(N,
 
 x$acc / N
 x$time
+chain = unlist(x$chain)
+###### theta
+chain[2, ] = tanh( chain[2, ] )
+chain[3, ] = exp( chain[3, ] )
+##### b
+chain[5, ] = tanh( chain[5, ] )
+##### v
+chain[2 * T + 7, ] = exp( chain[2 * T + 7, ] )
+############################### Convergence analysis
+################### Trace plots
+### burn
+burn = 100
+burned = as.matrix(chain[, -c(1:burn)])
+###### theta
+par(mfrow = c(2, 2))
+plot(burned[1, ], type = 'l', main = 'mu')
+plot(acf(burned[1, ], lag.max = 100, plot = FALSE)[1:100])
+plot(burned[2, ], type = 'l', main = 'phi')
+plot(acf(burned[2, ], lag.max = 100, plot = FALSE)[1:100])
+plot(burned[3, ], type = 'l', main = 'sigma')
+plot(acf(burned[3, ], lag.max = 100, plot = FALSE)[1:100])
+par(mfrow = c(1, 1))
+###### b
+par(mfrow = c(2, 2))
+plot(burned[4, ], type = 'l', main = 'b0')
+plot(acf(burned[4, ], lag.max = 100, plot = FALSE)[1:100])
+plot(burned[5, ], type = 'l', main = 'b1')
+plot(acf(burned[5, ], lag.max = 100, plot = FALSE)[1:100])
+plot(burned[6, ], type = 'l', main = 'b2')
+plot(acf(burned[6, ], lag.max = 100, plot = FALSE)[1:100])
+par(mfrow = c(1, 1))
+###### v
+par(mfrow = c(1, 2))
+plot(burned[2 * T + 7, ], type = 'l', main = 'v')
+plot(acf(burned[2 * T + 7, ], lag.max = 100, plot = FALSE)[1:100])
+par(mfrow = c(1, 1))
+###### h
+X = burned[7:(T + 6), ]
+h_hat = apply(X, MARGIN = 1, FUN = mean)
+h_min = apply(X, MARGIN = 1, FUN = quantile, probs = c(0.05) )
+h_max = apply(X, MARGIN = 1, FUN = quantile, probs = c(0.975) )
+data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
+data = data.frame(data)
+names(data) = c('obs', 'vdd', 'media', 'min','max')
+library(ggplot2)
+g = ggplot(data) 
+g = g + geom_line(aes(obs, media))
+g = g + geom_line(aes(obs, vdd), color = 'red')
+g = g + geom_line(aes(obs, min), linetype = 'dashed')
+g = g + geom_line(aes(obs, max), linetype = 'dashed')
+g
