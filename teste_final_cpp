@@ -11,10 +11,10 @@ double logpost_theta(vec theta, List param){
   //#param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     mu_0 = param["mu_0"], s_0 = param["s_0"], 
-                                     a_phi = param["a_phi"], b_phi = param["b_phi"],
-                                                                          a_s = param["a_s"], b_s = param["b_s"];
+    a_phi = param["a_phi"], b_phi = param["b_phi"],
+    a_s = param["a_s"], b_s = param["b_s"];
   
-  vec h = param["h"]; //obs. transformar em vetor
+  vec h = param["h"]; 
   
   //# construindo o vetor z = ( h[2:T] - phi*h[1:(T-1)] - mu*(1 - phi) );
   int T = h.n_elem;
@@ -41,8 +41,8 @@ vec glogpost_theta(vec theta, List param){
   //#param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     mu_0 = param["mu_0"], s_0 = param["s_0"], 
-                                     a_phi = param["a_phi"], b_phi = param["b_phi"],
-                                                                          a_s = param["a_s"], b_s = param["b_s"];
+    a_phi = param["a_phi"], b_phi = param["b_phi"],
+    a_s = param["a_s"], b_s = param["b_s"];
   
   vec h = param["h"], grad(3); //obs. transformar em vetor
   
@@ -56,7 +56,7 @@ vec glogpost_theta(vec theta, List param){
   
   // gradiente mu
   grad[0] = (1 - pow(phi, 2) ) * (h[0] - mu) * pow(sigma, -2); 
-  grad[0] += (1 - phi)/sigma * sum( z );
+  grad[0] += (1 - phi) * pow(sigma, -2) * sum( z );
   //priori
   grad[0] += - (mu - mu_0) * pow(s_0, -2);
   
@@ -71,7 +71,7 @@ vec glogpost_theta(vec theta, List param){
   
   // gradiente gama
   grad[2] = - T + (1 - pow(phi, 2)) * pow( (h[0] - mu)/sigma, 2 ); 
-  grad[2] += ( dot(z, z) )/sigma;   
+  grad[2] += ( dot(z, z) ) * pow(sigma, -2);   
   // priori
   grad[2] += - 2 * (a_s + 1) + 2 * b_s * pow(sigma, -2);
   // jacobiano
@@ -84,7 +84,7 @@ mat G_theta(vec theta, List param){
   // param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     s_0 = param["s_0"], a_phi = param["a_phi"], b_phi = param["b_phi"], 
-                b_s = param["b_s"];
+    b_s = param["b_s"];
   
   vec h = param["h"];
   int T = h.n_elem;
@@ -101,7 +101,7 @@ mat G_theta(vec theta, List param){
   G(2, 1) = 2 * phi;
   
   //3a col
-  G(0, 2) = G(2, 0);
+  //G(0, 2) = G(2, 0);
   G(1, 2) = G(2, 1);
   G(2, 2) = 2 * T + 4 * b_s * pow(sigma, -2);
   
@@ -116,15 +116,15 @@ mat dG_theta_phi(vec theta, List param){
   // param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     s_0 = param["s_0"], a_phi = param["a_phi"], b_phi = param["b_phi"], 
-                b_s = param["b_s"];
+    b_s = param["b_s"];
   
   vec h = param["h"];
   int T = h.n_elem;
   mat dG(3, 3, fill::zeros);
   
-  dG(0, 0) = -2 * (1 - pow(phi, 2) ) * (phi + (T - 1) * (1 - phi) ) * pow(sigma, -2);
+  dG(0, 0) = -2 * (1 - pow(phi, 2) ) * pow(sigma, -2) * (phi + (T - 1) * (1 - phi) ) ;
   dG(1 ,1) = 2 * phi * (1 - pow(phi, 2) ) * (2 - (T-1) - a_phi - b_phi );
-  dG(1, 2) = 2 * (1 - phi);
+  dG(1, 2) = 2 * (1 - pow(phi, 2) );
   dG(2, 1) = dG(1, 2);
   
   return dG;
@@ -318,10 +318,13 @@ vec glogpost_h(vec h, List param){
   r[0] = ( h[0] - phi * h[1] - mu * (1 - phi) ) * pow(sigma, -2);
   r[T-1] = ( h[T-1] - phi * h[T-2] + mu * (1 - phi) ) * pow(sigma, -2);
   
+  r.subvec(1, T-2) = ( (1 + pow(phi, 2) ) * h.subvec(1, T-2) - phi * ( h.subvec(2, T-1) + h.subvec(0, T-3) ) ) * pow(sigma, -2);
+  
+  /*
   for(int i = 1; i < T - 1 ; i++){
     r[i] = ( (1 + pow(phi, 2) ) * h[i] - phi * ( h[i+1] + h[i-1]) ) * pow(sigma, -2);
   }
-  
+  */
   return s - r;
 }
 //#############################################################################
@@ -691,6 +694,7 @@ List svm_smn(int N, vec eps_theta, int min_L_theta, int max_L_theta,
   
   return List::create( Named("chain") = chain, Named("acc") = acc, Named("time") = time );
 }
+
 
 ################################################################################################
 path = 'Área de Trabalho/Mestrado/Projeto/Projeto II/Simulação/test_final_cpp.cpp'
