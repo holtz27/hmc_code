@@ -310,7 +310,7 @@ vec glogpost_h(vec h, List param){
   
   //# construindo o vetor s
   int T = h.n_elem;
-  vec s(T), r(T), mu_t(T);
+  vec s(T), r(T), mu_t(T), u(T-2), v(T-2);
   
   mu_t = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp(h);
   s = - 0.5 + 0.5 * l % exp(-h) % pow( mu_t , 2) + b2 * l % mu_t;
@@ -319,7 +319,11 @@ vec glogpost_h(vec h, List param){
   r[0] = ( h[0] - phi * h[1] - mu * (1 - phi) ) * pow(sigma, -2);
   r[T-1] = ( h[T-1] - phi * h[T-2] + mu * (1 - phi) ) * pow(sigma, -2);
   
-  r.subvec(1, T-2) = ( (1 + pow(phi, 2) ) * h.subvec(1, T-2) - phi * ( h.subvec(2, T-1) + h.subvec(0, T-3) ) - mu * (1 - phi)*(1 - phi) ) * pow(sigma, -2);
+  u = h.subvec(1, T-2);
+  v = h.subvec(2, T-1) + h.subvec(0, T-3);
+  
+  r.subvec(1, T-2) = (1 + pow(phi, 2) ) * u - phi * v - mu * (1 - phi)*(1 - phi);
+  r.subvec(1, T-2) *= pow(sigma, -2);
   
   return s - r;
 }
