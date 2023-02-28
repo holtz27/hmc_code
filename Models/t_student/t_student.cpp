@@ -559,15 +559,7 @@ List rmhmc(int N, vec eps, int min_L, int max_L, vec theta_init, List param,
   // fun2 = glogpost
   // M = G
   // v = dG
-  
-  /*
-   if(seed == 0){
-   arma_rng::set_seed_random();
-   }else{
-   arma_rng::set_seed(seed);
-   }
-   */
-  
+    
   int acc = 0, r = theta_init.n_elem;
   double h;
   vec theta_current = theta_init, mu(r, fill::zeros), p_current;
@@ -603,12 +595,22 @@ List rmhmc(int N, vec eps, int min_L, int max_L, vec theta_init, List param,
   
   return( List::create(Named("chain") = chain, Named("acc") = acc, Named("time") = time) );
 }
+
+// ############################## set seed function
+void set_seed(int seed) {
+  Rcpp::Environment base_env("package:base");
+  Rcpp::Function set_seed_r = base_env["set.seed"];
+  set_seed_r(std::floor(std::fabs(seed)));
+}
+
 // [[Rcpp::export]]
 List svm_smn(int N, vec eps_theta, int min_L_theta, int max_L_theta,
              vec eps_b, int min_L_b, int max_L_b,
              double eps_h, int min_L_h, int max_L_h, 
              vec eps_e, int min_L_e, int max_L_e,
              vec init, List param, int fixed_p = 5){
+  
+  set_seed( param["seed"] );
   
   wall_clock timer;
   timer.tic();
