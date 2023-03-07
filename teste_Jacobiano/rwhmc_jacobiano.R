@@ -197,6 +197,7 @@ z$acc/N
 z$time
 
 chain = unlist(z$chain)
+sum( is.na(chain) )
 # sigma2 = exp(2w)
 chain[2, ] = exp( 2 * chain[2, ] )
 plot(chain[1, ], chain[2, ], xlab = 'mu', ylab = 'sigma2')
@@ -215,7 +216,7 @@ par(mfrow = c(1, 1))
 
 # Jumps
 lags = 5
-jumps = seq(0, N - burn, by = 1 + lags)
+jumps = seq(1, N - burn, by = lags)
 burned_lag = burned[, jumps]
 par(mfrow = c(2, 2))
 plot(burned_lag[1, ], type = 'l')
