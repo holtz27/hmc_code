@@ -39,7 +39,7 @@ double logpost_v_1(vec e, List param){
   L = 0.5 * T * v * log( 0.5 * v  ) - T * log( tgamma( 0.5 * v )  );
   L += 0.5 * v * sum( log(l) - l );
   //# priori
-  L += a_v * log(v) - b_v * v;
+  L += a_v * log( v ) - b_v * v;
   
   return L;
 }
@@ -49,9 +49,9 @@ vec glogpost_v_1(vec e, List param){
   vec l = param["l"], grad(1);
   int T = l.n_elem;
   
-  grad(0) = 0.5 * T * v * log(0.5 * v) - 0.5 * T * v * R::digamma(0.5 * v);
+  grad(0) = 0.5 * T * v * log(0.5 * v) + 0.5 * T * v - 0.5 * T * v * R::digamma(0.5 * v);
   grad(0) += 0.5 * v * sum( log(l) - l ); 
-  grad(0) += a_v - b_v * v + 0.5 * T * v;
+  grad(0) += a_v - b_v * v;
   
   return grad;
 }
@@ -62,7 +62,8 @@ mat G_v_1(vec e, List param){
   int T = l.n_elem;
   mat G(1, 1);
   
-  G(0, 0) = T * pow(v, 2) * R::psigamma(0.5 * v, 1) / 4 - v * ( b_v - 0.5 * T );
+  G(0, 0) = 0.25 * T * v * v * R::psigamma(0.5 * v, 1);
+  G(0, 0) +=  v * b_v - 0.5 * T * v;
   
   return G;
 }
@@ -74,11 +75,11 @@ mat dG_v_1(vec e, List param){
   mat dG(1, 1);
   
   dG(0, 0) = 0.5 * T * pow(v, 2) * R::psigamma(0.5 * v, 1);
-  dG(0, 0) += T * pow(v, 3) * R::psigamma(0.5 * v, 2)/8 - 0.5 * T - b_v;
+  dG(0, 0) += 0.125 * T * pow(v, 3) * R::psigamma(0.5 * v, 2);
+  dG(0, 0) += b_v * v - 0.5 * T * v;
   
   return dG;
 }
-
 //function pointer
 typedef double ( * num_ptr )(vec, List);
 typedef vec    ( * vec_ptr )(vec, List);
