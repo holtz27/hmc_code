@@ -12,8 +12,8 @@ double logpost_theta(vec theta, List param){
   //#param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     mu_0 = param["mu_0"], s_0 = param["s_0"], 
-                                     a_phi = param["a_phi"], b_phi = param["b_phi"],
-                                                                          a_s = param["a_s"], b_s = param["b_s"];
+    a_phi = param["a_phi"], b_phi = param["b_phi"],
+    a_s = param["a_s"], b_s = param["b_s"];
   
   vec h = param["h"]; 
   
@@ -44,6 +44,9 @@ vec glogpost_theta(vec theta, List param){
     mu_0 = param["mu_0"], s_0 = param["s_0"], 
                                      a_phi = param["a_phi"], b_phi = param["b_phi"],
                                                                           a_s = param["a_s"], b_s = param["b_s"];
+  
+  
+  //phi = tanh(theta[1]), sigma = exp(theta[2]), 
   
   vec h = param["h"], grad(3); //obs. transformar em vetor
   
@@ -87,6 +90,8 @@ mat G_theta(vec theta, List param){
     s_0 = param["s_0"], a_phi = param["a_phi"], b_phi = param["b_phi"], 
                 b_s = param["b_s"];
   
+  //phi = tanh(theta[1]), sigma = exp(theta[2]),
+  
   vec h = param["h"];
   int T = h.n_elem;
   mat G(3, 3, fill::zeros);
@@ -119,6 +124,8 @@ mat dG_theta_phi(vec theta, List param){
     s_0 = param["s_0"], a_phi = param["a_phi"], b_phi = param["b_phi"], 
                 b_s = param["b_s"];
   
+  //phi = tanh(theta[1]), sigma = exp(theta[2]), 
+  
   vec h = param["h"];
   int T = h.n_elem;
   mat dG(3, 3, fill::zeros);
@@ -135,6 +142,8 @@ mat dG_theta_sigma(vec theta, List param){
   // param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     b_s = param["b_s"];
+  
+  //phi = tanh(theta[1]), sigma = exp(theta[2]), 
   
   vec h = param["h"];
   int T = h.n_elem;
@@ -350,6 +359,26 @@ double log_Jac_e(vec e, List param){
   return log( v );
 }
 //#############################################################################
+//########################## l
+vec l_gibbs(List param){
+  //param = (y, h, b, e)
+  // e = log(v)
+  double e = param["e"], v = exp( e );
+  vec y = param["y_T"], h = param["h"], b = param["b"];
+  int T = h.n_elem;
+  
+  vec l(T), u(T);
+  
+  u = exp(-h) % pow(y.subvec(1, T) - b[0] - b[1] * y.subvec(0, T-1) - b[2] * exp(h), 2);
+  
+  for(int i = 0; i < T; i++){
+    l(i) = R::rgamma(0.5 * (v + 1), pow(0.5 * (u[i] + v), -1) );  
+  }
+  
+  return l;
+  
+}
+//#############################################################################
 //#############################################################################
 // ################################ Algorithm #################################
 
@@ -477,7 +506,7 @@ void set_seed(int seed) {
   set_seed_r(std::floor(std::fabs(seed)));
 }
 // [[Rcpp::export]]
-List svm_smn(int N, 
+List svm_smn(int N, int T,
              vec eps_theta, int min_L_theta, int max_L_theta,
              vec eps_b, int min_L_b, int max_L_b,
              vec eps_e, int min_L_e, int max_L_e,
@@ -493,12 +522,12 @@ List svm_smn(int N,
   mat_ptr v_theta[3] = {&dG_theta_mu, &dG_theta_phi, &dG_theta_sigma},
     v_b[3] = {&dG_b_b0, &dG_b_b1, &dG_b_b2}, v_e[1] = { &dG_v_1 };
   
-  vec acc(3, fill::zeros); //y_T = param["y_T"] 
+  vec acc(4, fill::zeros); //y_T = param["y_T"] 
   int z_acc, a = floor(0.1 * N); //T = y_T.n_elem
   List z;
   
   // iniciando a cadeia
-  mat chain(7, N + 1, fill::zeros); //chain(2 * T + 5, N + 1, fill::zeros)
+  mat chain(T + 7, N + 1, fill::zeros); //chain(2 * T + 5, N + 1, fill::zeros)
   chain.col(0) += init;
   
   for( int it = 1; it <= N; it++ ){
@@ -545,9 +574,15 @@ List svm_smn(int N,
     z_acc =  z["acc"];
     acc(2) += z_acc;
     z_acc = 0;
-    chain.col( it ).tail( 1 ) += pivot_4.col(1);
+    chain.col( it ).row( 6 ) += pivot_4.col(1);
     // Atualizando lista param
     param["e"] = chain.col( it ).tail( 1 );
+    
+    //(iv) l
+    chain.col( it ).subvec( 7, T + 6 ) += l_gibbs( param );
+    acc(3) += 1;
+    // Atualizando lista param
+    param["l"] = chain.col( it ).subvec( 7, T + 6 );
     
     //Progress bar
     if( (it % a) == 0 ) cout << "Progresso em " << ceil(100 * it / N)<<" %"<< endl;
