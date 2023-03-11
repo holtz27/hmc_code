@@ -12,8 +12,8 @@ double logpost_theta(vec theta, List param){
   //#param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
   double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     mu_0 = param["mu_0"], s_0 = param["s_0"], 
-    a_phi = param["a_phi"], b_phi = param["b_phi"],
-    a_s = param["a_s"], b_s = param["b_s"];
+                                     a_phi = param["a_phi"], b_phi = param["b_phi"],
+                                                                          a_s = param["a_s"], b_s = param["b_s"];
   
   vec h = param["h"]; 
   
@@ -378,6 +378,57 @@ vec l_gibbs(List param){
   return l;
   
 }
+//########################## h
+double logpost_h(vec h, List param){
+  //#h = (h1, ..., hT)
+  //#param = (y, l, theta, b)
+  
+  vec y = param["y_T"], l = param["l"], theta = param["theta"], b = param["b"];
+  double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]),
+    b0 = b[0], b1 = b[1], b2 = b[2];
+  
+  //# construindo o vetor z
+  int T = h.n_elem;
+  vec z(T), v(T), u(T - 1);
+  
+  z = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp(h);
+  v = l % exp( -h ) % z;
+  
+  u = h.subvec(1, T-1) - phi * h.subvec(0, T-2) - mu * (1 - phi);
+  
+  L =  - 0.5 * sum( h ) - dot(z, v);
+  L += - 0.5 * ( dot(u, u) ) * pow(sigma, -2);
+  L += - 0.5 * (1 - pow(phi, 2) ) * pow( (h[0] - mu)/sigma, 2 );
+  
+  return L;
+}
+vec glogpost_h(vec h, List param){
+  //#h = (h1, ..., hT)
+  //#param = (y, l, theta, b)
+  
+  vec y = param["y_T"], l = param["l"], theta = param["theta"], b = param["b"];
+  double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]),
+    b0 = b[0], b1 = b[1], b2 = b[2];
+  
+  //# construindo o vetor s
+  int T = h.n_elem;
+  vec s(T), r(T), mu_t(T), u(T-2), v(T-2);
+  
+  mu_t = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp(h);
+  s = - 0.5 + 0.5 * l % exp(-h) % pow( mu_t , 2) + b2 * l % mu_t;
+  
+  //# construindo o vetor r
+  r[0] = ( h[0] - phi * h[1] - mu * (1 - phi) ) * pow(sigma, -2);
+  r[T-1] = ( h[T-1] - phi * h[T-2] + mu * (1 - phi) ) * pow(sigma, -2);
+  
+  u = h.subvec(1, T-2);
+  v = h.subvec(2, T-1) + h.subvec(0, T-3);
+  
+  r.subvec(1, T-2) = (1 + pow(phi, 2) ) * u - phi * v - mu * (1 - phi)*(1 - phi);
+  r.subvec(1, T-2) *= pow(sigma, -2);
+  
+  return s - r;
+}
 //#############################################################################
 //#############################################################################
 // ################################ Algorithm #################################
@@ -387,6 +438,111 @@ typedef double ( * num_ptr )(vec, List);
 typedef vec    ( * vec_ptr )(vec, List);
 typedef mat    ( * mat_ptr )(vec, List);
 
+// ############################## hmc function
+// energy function H
+double H_hmc(vec theta, vec p, List param, mat inv_M, num_ptr fun){
+  // M = M.i()
+  double u, k;
+  vec y = param["y_T"];
+  
+  k = 0.5 * dot(p, inv_M * p);
+  u = - fun(theta, param);
+  
+  return u + k;
+}
+// generalized leapfrog function
+mat lf(double eps, int L, vec theta_current, vec p_current, mat inv_M, 
+       List param, vec_ptr fun){
+  // M = M.i()
+  int T = theta_current.n_elem;
+  vec theta = theta_current, p = p_current, y = param["y_T"];
+  mat P(T, 2);
+  
+  // Integration Leapfrog
+  for( int k = 0; k < L; k++ ){
+    p += 0.5 * eps * fun(theta, param);
+    theta += eps * inv_M * p;
+    p += 0.5 * eps * fun(theta, param);
+  }
+  
+  P.col(0) = theta;
+  P.col(1) = p;
+  
+  return P;
+}
+List hmc(int N, double eps, int min_L, int max_L, vec theta_init, 
+         List param, num_ptr fun1, vec_ptr fun2){
+  
+  wall_clock timer;
+  timer.tic();
+  
+  int acc = 0, a = floor(0.1*N), dim = theta_init.n_elem;
+  double h, it = N;
+  mat chain(dim, N + 1, fill::value(1.7));
+  //inicialindo a cadeia
+  chain.col(0) = theta_init;
+  
+  vec mean(dim, fill::zeros), theta_current = theta_init, p_current;
+  mat M(dim, dim, fill::eye), inv_M = M.i(), Proposal(dim, 2);
+  
+  for(int i = 1; i <= N; i++){
+    //(i) gerando p_current e u
+    p_current = mvnrnd(mean, M);
+    
+    int L = randi( distr_param( min_L, max_L ) );
+    
+    //(ii) Leapfrog 
+    Proposal = lf(eps, L, theta_current, p_current, inv_M, param, fun2);
+    
+    // (iii) Calculando H's
+    h = H_hmc(theta_current, p_current, param, inv_M, fun1);
+    h -= H_hmc(Proposal.col(0), Proposal.col(1), param, inv_M, fun1);
+    
+    //(iv) Prop aceitação
+    if( R::runif(0, 1) < std::min( 1.0, exp(h) ) ){
+      chain.col(i) = Proposal.col(0);
+      theta_current = Proposal.col(0);
+      acc += 1;
+    }else{
+      chain.col(i) = theta_current;
+    }
+    //Progress
+    //if( (i % a) == 0 ) cout << "Progresso em " << ceil(100*i/N)<<" %"<< endl;
+  }
+  
+  double time = timer.toc();
+  
+  return List::create(Named("chain") = chain, Named("acc") = acc, Named("time") = time);
+}
+// ############################## hmc function one proposal
+List hmc_one(double eps, int min_L, int max_L, vec theta_init, 
+             List param, num_ptr fun1, vec_ptr fun2){
+  
+  int acc = 0, dim = theta_init.n_elem; 
+  double h; 
+  vec mean(dim, fill::zeros), theta_current = theta_init, p_current;
+  mat M(dim, dim, fill::eye), inv_M = M.i(), Proposal(dim, 2);
+  
+  //(i) gerando p_current e u
+  p_current = mvnrnd(mean, M);
+  
+  //(ii) Leapfrog
+  int L = randi( distr_param( min_L, max_L ) );
+  Proposal = lf(eps, L, theta_current, p_current, inv_M, param, fun2);
+  
+  // (iii) Calculando H's
+  h = H_hmc(theta_current, p_current, param, inv_M, fun1);
+  h -= H_hmc(Proposal.col(0), Proposal.col(1), param, inv_M, fun1);
+  
+  //(iv) Prop aceitação
+  if( R::runif(0, 1) < std::min( 1.0, exp(h) ) ){
+    //chain.col(i) = Proposal.col(0);
+    theta_current = Proposal.col(0);
+    acc += 1;
+  }
+  
+  return List::create(Named("theta_current") = theta_current, Named("acc") = acc);
+}
 // ############################## rmhmc function
 // energy function H
 double H(vec theta, vec p, List param, num_ptr fun, num_ptr log_Jac, mat_ptr M){
@@ -421,7 +577,7 @@ vec dH_theta(vec theta, vec p, List param, vec_ptr fun, mat_ptr M,
   
   return d ;
 }
-// generalized leapfrog
+// generalized leapfrog function
 mat glf(vec eps, int L, vec theta_current, vec p_current, int fixed_p, 
         List param, vec_ptr fun, mat_ptr M, mat_ptr v[]){
   
@@ -499,6 +655,43 @@ List rmhmc(int N, vec eps, int min_L, int max_L, vec theta_init, List param, int
   
   return( List::create(Named("chain") = chain, Named("acc") = acc) );
 }
+// ############################## rmhmc function one proposal
+List rmhmc_one(vec eps, int min_L, int max_L, vec theta_init, List param, int fixed_p, 
+               num_ptr fun1, num_ptr log_Jac, vec_ptr fun2, mat_ptr M, mat_ptr v[], int param_id){
+  
+  // fun1 = logpost
+  // fun2 = glogpost
+  // M = G
+  // v = dG
+  
+  int acc = 0, r = theta_init.n_elem;
+  double h;
+  vec theta_current = theta_init, mu(r, fill::zeros), p_current;
+  mat Prop(r, 2);
+  
+  //(i) gerando p_current
+  if( M(theta_init, param).is_sympd() ){
+    p_current  = mvnrnd(mu, M(theta_init, param) );  
+  }else{
+    cout << "Error in parameter: " << param_id << "!" << endl;
+  }
+  
+  //(ii) Generalizaded Leapfrog
+  int L = randi( distr_param( min_L, max_L ) );
+  Prop = glf(eps, L, theta_current, p_current, fixed_p, param, fun2, M, v);
+  
+  //(iii) Calculando H's
+  h = H(theta_current, p_current, param, fun1, log_Jac, M) 
+    - H(Prop.col(0), Prop.col(1), param, fun1, log_Jac, M);
+  
+  //(iv) Prop aceitação
+  if( R::runif(0, 1) < std::min( 1.0, exp(h) ) ){
+    theta_current = Prop.col(0);
+    acc += 1;
+  }
+  
+  return( List::create(Named("theta_current") = theta_current, Named("acc") = acc) );
+}
 // ############################## set seed function
 void set_seed(int seed) {
   Rcpp::Environment base_env("package:base");
@@ -510,6 +703,7 @@ List svm_smn(int N, int T,
              vec eps_theta, int min_L_theta, int max_L_theta,
              vec eps_b, int min_L_b, int max_L_b,
              vec eps_e, int min_L_e, int max_L_e,
+             double eps_h, int min_L_h, int max_L_h,
              vec init, List param, int fixed_p = 5){
   
   int seed = param["seed"];
@@ -522,59 +716,65 @@ List svm_smn(int N, int T,
   mat_ptr v_theta[3] = {&dG_theta_mu, &dG_theta_phi, &dG_theta_sigma},
     v_b[3] = {&dG_b_b0, &dG_b_b1, &dG_b_b2}, v_e[1] = { &dG_v_1 };
   
-  vec acc(4, fill::zeros); //y_T = param["y_T"] 
-  int z_acc, a = floor(0.1 * N); //T = y_T.n_elem
+  vec acc(5, fill::zeros); 
+  int z_acc, a = floor(0.1 * N); 
   List z;
   
   // iniciando a cadeia
-  mat chain(T + 7, N + 1, fill::zeros); //chain(2 * T + 5, N + 1, fill::zeros)
+  mat chain(2 * T + 7, N + 1, fill::zeros); 
   chain.col(0) += init;
   
   for( int it = 1; it <= N; it++ ){
     
     // (i) theta
-    z = rmhmc(1, eps_theta, min_L_theta, max_L_theta, 
+    z = rmhmc_one(eps_theta, min_L_theta, max_L_theta, 
               chain.col(it - 1).subvec(0, 2),
               param, 
               fixed_p,  
               &logpost_theta, &log_Jac_theta, &glogpost_theta, &G_theta, v_theta,
               10);
     
-    mat pivot_1 = z["chain"];
+    //mat pivot_1 = z["chain"];
+    vec pivot_1 = z["theta_current"];
     z_acc =  z["acc"];
     acc(0) += z_acc;
     z_acc = 0;
-    chain.col( it ).subvec( 0, 2 ) += pivot_1.col(1);
+    //chain.col( it ).subvec( 0, 2 ) += pivot_1.col(1);
+    chain.col( it ).subvec( 0, 2 ) += pivot_1;
     // Atualizando lista param
     param["theta"] = chain.col( it ).subvec( 0, 2 );
     
     // (ii) b
-    z = rmhmc(1, eps_b, min_L_b, max_L_b, 
+    z = rmhmc_one(eps_b, min_L_b, max_L_b, 
               chain.col(it - 1).subvec(3, 5), 
               param, 
               fixed_p,  
               &logpost_b, &log_Jac_b, &glogpost_b, &G_b, v_b,
               20);
-    mat pivot_2 = z["chain"];
+    //mat pivot_2 = z["chain"];
+    vec pivot_2 = z["theta_current"];
     z_acc =  z["acc"];
     acc(1) += z_acc;
     z_acc = 0;
-    chain.col( it ).subvec( 3, 5 ) += pivot_2.col(1);
+    //chain.col( it ).subvec( 3, 5 ) += pivot_2.col(1);
+    chain.col( it ).subvec( 3, 5 ) += pivot_2;
     // Atualizando lista param
     param["b"] = chain.col( it ).subvec( 3, 5 );
     
-    // (v) e
-    z = rmhmc(1, eps_e, min_L_e, max_L_e, 
+    // (iii) e
+    z = rmhmc_one(eps_e, min_L_e, max_L_e, 
               chain.col(it - 1).tail( 1 ), 
               param, 
               fixed_p,  
               &logpost_v_1, &log_Jac_e, &glogpost_v_1, &G_v_1, v_e,
               30);
-    mat pivot_4 = z["chain"];
+    //mat pivot_4 = z["chain"];
+    vec pivot_4 = z["theta_current"];
     z_acc =  z["acc"];
     acc(2) += z_acc;
     z_acc = 0;
-    chain.col( it ).row( 6 ) += pivot_4.col(1);
+    //chain.col( it ).row( 6 ) += pivot_4.col(1);
+    chain.col( it ).row( 6 ) += pivot_4;
     // Atualizando lista param
     param["e"] = chain.col( it ).tail( 1 );
     
@@ -583,6 +783,22 @@ List svm_smn(int N, int T,
     acc(3) += 1;
     // Atualizando lista param
     param["l"] = chain.col( it ).subvec( 7, T + 6 );
+    
+    // (v) h
+    z = hmc_one(eps_h, min_L_h, max_L_h, 
+            chain.col(it - 1).subvec( T + 7, 2 * T + 6 ), 
+            param,
+            &logpost_h, &glogpost_h);
+    
+    //mat pivot_3 = z["chain"];
+    vec pivot_3 = z["theta_current"];
+    z_acc =  z["acc"];
+    acc(4) += z_acc;
+    z_acc = 0;
+    //chain.col( it ).subvec( T + 7, 2 * T + 6 ) += pivot_3.col(1);
+    chain.col( it ).subvec( T + 7, 2 * T + 6 ) += pivot_3;
+    // Atualizando lista param
+    param["h"] = chain.col( it ).subvec( T + 7, 2 * T + 6 );
     
     //Progress bar
     if( (it % a) == 0 ) cout << "Progresso em " << ceil(100 * it / N)<<" %"<< endl;
