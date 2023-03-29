@@ -450,7 +450,7 @@ double H_hmc(vec theta, vec p, List param, mat inv_M, num_ptr fun){
   
   return u + k;
 }
-// generalized leapfrog function
+// leapfrog function
 mat lf(double eps, int L, vec theta_current, vec p_current, mat inv_M, 
        List param, vec_ptr fun){
   // M = M.i()
