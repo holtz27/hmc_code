@@ -1,0 +1,12 @@
+// energy function H
+double H_hmc(const vec theta, const vec p, const List param, const mat inv_M, 
+             num_ptr fun){
+  // M = M.i()
+  double E;
+  //const vec y = param["y_T"];
+  
+  E = 0.5 * dot(p, inv_M * p);
+  E -= fun(theta, param);
+  
+  return E;
+}
