@@ -1,0 +1,21 @@
+// leapfrog function
+
+mat lf(const double eps, const int L, const vec theta_current, const vec p_current, const mat inv_M, const List param, const vec_ptr fun){
+  
+  // M = M.i()
+  int T = theta_current.n_elem;
+  vec theta = theta_current, p = p_current, y = param["y_T"];
+  mat P(T, 2);
+  
+  // Integration Leapfrog
+  for( int k = 0; k < L; k++ ){
+    p += 0.5 * eps * fun(theta, param);
+    theta += eps * inv_M * p;
+    p += 0.5 * eps * fun(theta, param);
+  }
+  
+  P.col(0) = theta;
+  P.col(1) = p;
+  
+  return P;
+}
