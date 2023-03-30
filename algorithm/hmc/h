@@ -7,9 +7,9 @@ double H_hmc(const vec theta, const vec p, const List param, const mat inv_M,
   
   double E;
   
-  // Evaluating K factor
+  // Evaluting K factor
   E = 0.5 * dot(p, inv_M * p);
-  // Evaluating U factor
+  // Evaluting U factor
   E -= fun(theta, param);
   
   return E;
