@@ -11,7 +11,7 @@ mat lf(const double eps, const int L, const vec theta_current,
   // Integration Leapfrog
   for( int k = 0; k < L; k++ ){
     p += 0.5 * eps * fun(theta, param);
-    theta += eps * inv_M * p;
+    theta += eps * ( inv_M * p );
     p += 0.5 * eps * fun(theta, param);
   }
   
