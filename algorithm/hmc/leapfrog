@@ -1,7 +1,7 @@
 // leapfrog function
 mat lf(const double eps, const int L, const vec theta_current, 
        const vec p_current, const mat inv_M, const List param, 
-       const vec_ptr fun){
+       vec_ptr fun){
   
   // M = M.i()
   int T = param["T"];
