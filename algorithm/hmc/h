@@ -2,8 +2,8 @@
 double H_hmc(const vec theta, const vec p, const List param, const mat inv_M, 
              num_ptr fun){
   
-  // Energy function E = U + K, where U is the potencial energy and 
-  // K is the cinetic energy.
+  // Energy function E = U + K, where U is the potential energy and 
+  // K is the kinetic energy.
   
   double E;
   
