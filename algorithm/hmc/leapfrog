@@ -4,7 +4,6 @@ mat lf(const double eps, const int L, const vec theta_current,
        const vec_ptr fun){
   
   // M = M.i()
-  //int T = theta_current.n_elem;
   int T = param["T"];
   vec theta = theta_current, p = p_current;
   mat P(T, 2);
