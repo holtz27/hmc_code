@@ -1,6 +1,9 @@
 #include "hmc.h"
 
-//##################################### HMC
+//###################################################################################################################################################################
+//############################################################################## HMC ################################################################################
+//###################################################################################################################################################################
+
 // Energy function
 double H(vec theta, vec p, List param, mat inv_M, num_ptr fun){
   // M = M.i()
@@ -32,8 +35,8 @@ mat lf(double eps, int L, vec theta_current, vec p_current, mat inv_M, List para
   return P;
 }
 
-// hmc function
-List Hmc_one(double eps, int min_L, int max_L, vec theta_init, List param, num_ptr fun1, vec_ptr fun2){
+// hmc function one draw
+List hmc_one(double eps, int min_L, int max_L, vec theta_init, List param, num_ptr fun1, vec_ptr fun2){
   
   //wall_clock timer;
   //timer.tic();
@@ -72,7 +75,10 @@ List Hmc_one(double eps, int min_L, int max_L, vec theta_init, List param, num_p
   return List::create(Named("theta_current") = theta_current, Named("acc") = acc);
 }
 
-//##################################### RMHMC
+//###################################################################################################################################################################
+//############################################################################ RMHMC ################################################################################
+//###################################################################################################################################################################
+
 // energy function H
 double H_rmhmc(vec theta, vec p, List param, num_ptr fun, mat_ptr M){
   
@@ -138,8 +144,8 @@ mat glf(vec eps, int L, vec theta_current, vec p_current, int fixed_p, List para
   return Proposal;
 }
 
-// rmhmc function
-List Rmhmc_one(vec eps, int min_L, int max_L, vec theta_init, List param, int fixed_p, num_ptr fun1, vec_ptr fun2, mat_ptr M, mat_ptr v[]){
+// rmhmc function  one draw
+List rmhmc_one(vec eps, int min_L, int max_L, vec theta_init, List param, int fixed_p, num_ptr fun1, vec_ptr fun2, mat_ptr M, mat_ptr v[]){
   
   wall_clock timer;
   timer.tic();
