@@ -89,7 +89,7 @@ List Rmhmc_one(vec eps, int min_L, int max_L, vec theta_init, List param,
   mat Prop(r, 2); //chain(r, N + 1)
 
   //(i) gerando p_current
-  p_current  = mvnrnd( mu, G(theta_init, param) );
+  p_current  = mvnrnd( mu, M(theta_init, param) );
     
   int L = randi( distr_param( min_L, max_L ) );
     
