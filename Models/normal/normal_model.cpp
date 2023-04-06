@@ -4,14 +4,21 @@
 using namespace Rcpp;
 using namespace arma;
 
+//#############################################################################
+//#############################################################################
+// ################################ Functions #################################
 //########################## theta = (mu, phi, sigma) #########################
 //######## Transformação: T(theta) = theta'                         ###########  
 //######## theta' = (mu, arctanh(phi), log(sigma)) = (mu, w, gama) ############
 double logpost_theta(vec theta, List param){
   //#theta = (mu, w, gama)
   //#param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
-  double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
-    mu_0 = param["mu_0"], s_0 = param["s_0"], 
+  double L = 0.0; 
+  double mu = theta[0];
+  double phi = tanh( theta[1] ); 
+  double sigma = exp( theta[2] );
+  
+  double  mu_0 = param["mu_0"], s_0 = param["s_0"], 
     a_phi = param["a_phi"], b_phi = param["b_phi"],
     a_s = param["a_s"], b_s = param["b_s"];
   
@@ -19,69 +26,79 @@ double logpost_theta(vec theta, List param){
   
   //# construindo o vetor z = ( h[2:T] - phi*h[1:(T-1)] - mu*(1 - phi) );
   int T = h.n_elem;
-  vec z(T - 1);
+  //vec z = h.subvec(1, T-1) - phi * h.subvec(0, T-2) - mu * (1 - phi);
   
-  z = h.subvec(1, T-1) - phi * h.subvec(0, T-2) - mu * (1 - phi);
+  L += 0.5 * log(1 - phi * phi ) - T * log( sigma ); 
+  L -= 0.5 * (1 - phi * phi ) * ( (h[0] - mu)/sigma ) * ( (h[0] - mu)/sigma ); 
   
-  L = 0.5 * log(1 - pow(phi, 2) ); 
-  L += - 0.5 * (1 - pow(phi, 2) ) * pow( (h[0] - mu)/sigma , 2); 
-  L += - ( 0.5 * pow(sigma, -2) ) * dot(z, z) - T * log(sigma);
+  
+  for( int j = 1 ; j < T ; j++ ){
+    L += - (0.5 / (sigma * sigma)) * ( h[j] - mu - phi * (h[j-1] - mu)) * ( h[j] - mu - phi * (h[j-1] - mu));
+  }
+  
+  
+  //L -= ( 0.5 * pow(sigma, -2) ) * dot(z, z); 
+  
+  
   //# priori mu
-  L += - 0.5 * pow((mu - mu_0)/s_0, 2);
+  L += - 0.5 * ((mu - mu_0)/s_0) * ((mu - mu_0)/s_0);
   //# priori phi
   L += (a_phi - 1) * log(1 + phi) + (b_phi - 1) * log(1 - phi);
   //# priori sigma
-  L += - 2 * (a_s + 1) * log(sigma) - b_s * pow(sigma, -2);
+  L += - 2 * (a_s + 1) * log(sigma) - b_s / ( sigma * sigma);
   //# jacobiano de T
-  //L += log( 1 - pow(phi, 2) ) + log(sigma);
+  L += log( 1 - phi * phi ) + log( sigma );
   
   return L; 
 }
 vec glogpost_theta(vec theta, List param){
   //#theta = (mu, w, gama)
   //#param = (h, mu_0, s_0, a_phi, b_phi, a_s, b_s)
-  double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
+  double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]), 
     mu_0 = param["mu_0"], s_0 = param["s_0"], 
                                      a_phi = param["a_phi"], b_phi = param["b_phi"],
                                                                           a_s = param["a_s"], b_s = param["b_s"];
   
+  vec h = param["h"], grad = zeros<vec>(3, 1); 
   
-  //phi = tanh(theta[1]), sigma = exp(theta[2]), 
-  
-  vec h = param["h"], grad(3); //obs. transformar em vetor
-  
-  // construindo o vetor z = ( h[2:T] - phi*h[1:(T-1)] - mu*(1 - phi) )
-  // e o vetor s = h[1:(T-1)] - mu
   int T = h.n_elem;
-  vec z(T - 1), s(T - 1);
-  
-  z = h.subvec(1, T-1) - phi * h.subvec(0, T-2) - mu * (1 - phi);
-  s = h.subvec(0, T-2) - mu;
   
   // gradiente mu
-  grad[0] = (1 - pow(phi, 2) ) * (h[0] - mu) * pow(sigma, -2); 
-  grad[0] += (1 - phi) * pow(sigma, -2) * sum( z );
+  grad[0] += (1 - phi * phi ) * (h[0] - mu) / (sigma * sigma); 
+  
+  for( int j = 1 ; j < T ; j++ ){
+    grad[0] += (1 - phi) / (sigma * sigma) * ( h[j] - mu - phi * (h[j-1] - mu) );
+  }
+  
   //priori
-  grad[0] += - (mu - mu_0) * pow(s_0, -2);
+  grad[0] += - (mu - mu_0) / (s_0 * s_0);
   
   //gradiente w
-  grad[1] = - phi + phi * (1 - pow(phi, 2) ) * pow( (h[0] - mu)/sigma, 2 );
-  grad[1] += (1 - pow(phi, 2) ) * pow(sigma, -2) * dot(z, s); 
+  grad[1] += - phi + phi * (1 - phi * phi ) * ((h[0] - mu)/sigma) * ((h[0] - mu)/sigma);
+  
+  for( int j = 1 ; j < T ; j++ ){
+    grad[1] += (1 - phi * phi) / (sigma * sigma) * ( h[j] - mu - phi * (h[j-1] - mu) ) * (h[j-1] - mu);
+  }
+  
   //priori
   grad[1] += (a_phi - 1) * (1 - phi);
   grad[1] += - (b_phi - 1) * (1 + phi);
   //jacobiano
-  //grad[1] += - 2 * phi;
+  grad[1] += - 2 * phi;
   
   // gradiente gama
-  grad[2] = - T + (1 - pow(phi, 2)) * pow( (h[0] - mu)/sigma, 2 ); 
-  grad[2] += ( dot(z, z) ) * pow(sigma, -2);   
-  // priori
-  grad[2] += - 2 * (a_s + 1) + 2 * b_s * pow(sigma, -2);
-  // jacobiano
-  //grad[2] += 1;
+  grad[2] += - T + (1 - phi * phi ) * ((h[0] - mu)/sigma) * ((h[0] - mu)/sigma); 
   
-  return grad;
+  for( int j = 1 ; j < T ; j++ ){
+    grad[2] += 1.0 / (sigma * sigma) * ( h[j] - mu - phi * (h[j-1] - mu) ) * ( h[j] - mu - phi * (h[j-1] - mu) );
+  }
+  
+  // priori
+  grad[2] += - 2 * (a_s + 1) + 2 * b_s / (sigma * sigma);
+  // jacobiano
+  grad[2] += 1;
+  
+  return -grad;
 }
 mat G_theta(vec theta, List param){
   // theta = (mu, w, gama)
@@ -185,13 +202,13 @@ double logpost_b(vec b, List param){
   
   L = - 0.5 * dot(z, u);
   //# priori b0  
-  L += - 0.5 * pow( (b0 - mu_b0)/s_b0, 2 );
+  L += - 0.5 * ((b0 - mu_b0)/s_b0) * (b0 - mu_b0)/s_b0;
   //# priori b1
   L += (a_b1 - 1) * log(1 + b1) + (b_b1 - 1) * log(1 - b1);
   //# priori b2
-  L += - 0.5 * pow( (b2 - mu_b2)/s_b2, 2 );
+  L += - 0.5 * ((b2 - mu_b2)/s_b2) * ((b2 - mu_b2)/s_b2);
   //# jacobiano
-  //L += log(1 - pow(b1, 2) );
+  L += log(1 - b1 * b1 );
   
   return L;
 }
@@ -200,33 +217,29 @@ vec glogpost_b(vec b, List param){
   //#param = (y, h, l, mu_b0, s_b0, a_b1, b_b1, mu_b2, s_b2)
   //# y = (y0. y1, ..., yT)
   
-  double b0 = b[0], b1 = tanh(b[1]), b2 = b[2], L,
+  double b0 = b[0], b1 = tanh(b[1]), b2 = b[2], 
     mu_b0 = param["mu_b0"], s_b0 = param["s_b0"],
-    a_b1 = param["a_b1"], b_b1 = param["b_b1"],
-    mu_b2 = param["mu_b2"], s_b2 = param["s_b2"];
+                                        a_b1 = param["a_b1"], b_b1 = param["b_b1"],
+                                                                          mu_b2 = param["mu_b2"], s_b2 = param["s_b2"];
   
-  vec grad(3), y = param["y_T"], h = param["h"]; //, l = param["l"]
+  vec grad = zeros<vec>(3, 1), y = param["y_T"], h = param["h"];
   
   // construindo os vetores u, v e z
   int T = h.n_elem;
-  vec z(T), u(T), v(T);
+  vec z = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp( h );
+  vec v = exp( -h );
+  vec u = exp( -h ) % y.subvec(0, T-1);
   
-  //v = l % exp(-h); 
-  //u = l % exp(- h ) % y.subvec(0, T-1);
-  v = exp(-h);
-  u = exp(- h ) % y.subvec(0, T-1);
-  z = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp( h );
+  grad[0] = dot(v, z) - (b0 - mu_b0) / (s_b0 * s_b0);
   
-  grad[0] = dot(v, z) - (b0 - mu_b0) * pow(s_b0, -2);
-  
-  grad[1] = (1 - pow(b1, 2) ) * ( dot(u, z) ) + (a_b1 - 1) * (1 - b1);
-  grad[1] +=  - (b_b1 - 1) * (1 + b1); 
+  grad[1] = (1 - b1 * b1 ) * ( dot(u, z) ) + (a_b1 - 1) * (1 - b1);
+  grad[1] -=  (b_b1 - 1) * (1 + b1); 
   //# jacobiano
-  //grad[1] +=  - 2 * b1;
+  grad[1] -=  2 * b1;
   
-  grad[2] = sum( z ) - (b2 - mu_b2) * pow(s_b2, -2);
+  grad[2] = sum( z ) - (b2 - mu_b2) /(s_b2 * s_b2);
   
-  return grad;
+  return - grad;
 }
 mat G_b(vec b, List param){
   //b = (b0, delta, b2)
@@ -234,7 +247,7 @@ mat G_b(vec b, List param){
   //y = (y0. y1, ..., yT)
   
   double b0 = b[0], b1 = tanh(b[1]), b2 = b[2], s_b0 = param["s_b0"], 
-         a_b1 = param["a_b1"], b_b1 = param["b_b1"], s_b2 = param["s_b2"];
+                                                            a_b1 = param["a_b1"], b_b1 = param["b_b1"], s_b2 = param["s_b2"];
   
   vec y = param["y_T"], h = param["h"]; //, l = param["l"]
   int T = h.n_elem;
@@ -269,7 +282,7 @@ mat dG_b_b1(vec b, List param){
   //y = (y0. y1, ..., yT)
   
   double b0 = b[0], b1 = tanh(b[1]), b2 = b[2], s_b0 = param["s_b0"], 
-         a_b1 = param["a_b1"], b_b1 = param["b_b1"], s_b2 = param["s_b2"];
+                                                            a_b1 = param["a_b1"], b_b1 = param["b_b1"], s_b2 = param["s_b2"];
   
   vec y = param["y_T"], h = param["h"]; //, l = param["l"]
   int T = h.n_elem;
@@ -304,22 +317,22 @@ double logpost_h(vec h, List param){
   //#h = (h1, ..., hT)
   //#param = (y, l, theta, b)
   
-  vec y = param["y_T"], theta = param["theta"], b = param["b"]; //, l = param["l"]
-  double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]),
-    b0 = b[0], b1 = b[1], b2 = b[2];
+  vec y = param["y_T"], theta = param["theta"], b = param["b"]; 
+  double L = 0.0, mu = theta[0], phi = tanh( theta[1] ), sigma = exp(theta[2]),
+    b0 = b[0], b1 = tanh( b[1] ), b2 = b[2];
   
-  //# construindo o vetor z
+ 
   int T = h.n_elem;
-  vec z(T), v(T), u(T - 1);
   
-  z = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp(h);
-  v = exp( -h ) % z;
+  L +=  - 0.5 * sum( h );
+ 
+  for( int j = 1 ; j < T ; j++ ){
+    L += - 0.5 / ( sigma * sigma ) * ( h[j] - mu - phi * (h[j-1] - mu) ) * ( h[j] - mu - phi * (h[j-1] - mu) );
+    L += - 0.5 * exp( -h[j] ) * ( y[j+1] - b0 - b1 * y[j] - b2 * exp( h[j]) ) * ( y[j+1] - b0 - b1 * y[j] - b2 * exp(h[j]) );
+  }
   
-  u = h.subvec(1, T-1) - phi * h.subvec(0, T-2) - mu * (1 - phi);
-  
-  L =  - 0.5 * sum( h ) - dot(z, v);
-  L += - 0.5 * ( dot(u, u) ) * pow(sigma, -2);
-  L += - 0.5 * (1 - pow(phi, 2) ) * pow( (h[0] - mu)/sigma, 2 );
+  L += - 0.5 * exp( -h[0] ) * ( y[1] - b0 - b1 * y[0] - b2 * exp( h[0]) ) * ( y[1] - b0 - b1 * y[0] - b2 * exp(h[0]) );
+  L += - 0.5 * (1 - phi * phi ) * ((h[0] - mu)/sigma) * ((h[0] - mu)/sigma);
   
   return L;
 }
@@ -327,26 +340,26 @@ vec glogpost_h(vec h, List param){
   //#h = (h1, ..., hT)
   //#param = (y, l, theta, b)
   
-  vec y = param["y_T"], theta = param["theta"], b = param["b"]; //l = param["l"],
-  double L, mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]),
-    b0 = b[0], b1 = b[1], b2 = b[2];
+  vec y = param["y_T"], theta = param["theta"], b = param["b"]; 
+  double mu = theta[0], phi = tanh(theta[1]), sigma = exp(theta[2]),
+    b0 = b[0], b1 = tanh( b[1] ), b2 = b[2];
   
   //# construindo o vetor s
   int T = h.n_elem;
-  vec s(T), r(T), mu_t(T), u(T-2), v(T-2);
+  vec r  = zeros<vec>(T, 1);
+  vec mu_t = y.subvec(1, T) - b0 - b1 * y.subvec(0, T - 1) - b2 * exp(h);
   
-  mu_t = y.subvec(1, T) - b0 - b1 * y.subvec(0, T-1) - b2 * exp(h);
-  s = - 0.5 + 0.5 * exp(-h) % pow( mu_t , 2) + b2 * mu_t;
+  vec s = - 0.5 + 0.5 * exp( -h ) % mu_t % mu_t + b2 * mu_t;
   
   //# construindo o vetor r
-  r[0] = ( h[0] - phi * h[1] - mu * (1 - phi) ) * pow(sigma, -2);
-  r[T-1] = ( h[T-1] - phi * h[T-2] + mu * (1 - phi) ) * pow(sigma, -2);
+  r[0] += ( h[0] - phi * h[1] - mu * (1 - phi) ) / (sigma * sigma);
+  r[T-1] = 1 / (sigma * sigma) * (h[T-1] - mu - phi * (h[T-2] - mu) );
   
-  u = h.subvec(1, T-2);
-  v = h.subvec(2, T-1) + h.subvec(0, T-3);
+  vec u = h.subvec(1, T - 2);
+  vec v = h.subvec(2, T - 1) + h.subvec(0, T - 3);
   
-  r.subvec(1, T-2) = (1 + pow(phi, 2) ) * u - phi * v - mu * (1 - phi) * (1 - phi);
-  r.subvec(1, T-2) *= pow(sigma, -2);
+  r.subvec(1, T-2) += (1 + phi * phi ) * u - phi * v - mu * (1 - phi) * (1 - phi);
+  r.subvec(1, T-2) /= sigma * sigma ;
   
   return s - r;
 }
