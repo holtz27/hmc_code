@@ -8,9 +8,9 @@ double mu_b0 = 0.0, s_b0 = 3.2;
 double a_b1 = 10, b_b1 = 10;
 double mu_b2 = 5.0, s_b2 = 1.5;
 
-/***********************************************************************************/
-/***********************************************************************************/
-/***********************************************************************************/
+//#############################################################################
+//#############################################################################
+
 vec mvrgaussian(int n){
     vec xr = zeros<vec>(n, 1);
     for( int j = 0 ; j < n ; j++ ){
@@ -144,17 +144,15 @@ vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &a
   
     vec theta1p = zeros<vec>(3, 1);
     vec theta1 = zeros<vec>(3, 1);
-    //int jfix = 1;
-    //int jgl = 1;
     mat inv_G = zeros<mat>(3, 3);
     mat dG_mu = zeros<mat>(3, 3);
     mat dG_omega = zeros<mat>(3, 3);
     mat dG_gamma = zeros<mat>(3, 3);
     mat G = zeros<mat>(3, 3);
-    /****************************************************************/
+    //################################################################
     G_theta(theta_cur, G, inv_G, dG_mu, dG_omega, dG_gamma, T);
     vec pcur = chol( G ).t() * mvrgaussian( 3 );
-    /****************************************************************/
+    //################################################################
     vec aux = pcur.t() * inv_G * pcur;
     vec pa = zeros<vec>(3, 1);
     vec pb = zeros<vec>(3, 1);
@@ -162,13 +160,10 @@ vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &a
     vec gdpth1( 3 );
     vec gdmom1( 3 );
     vec gdmom2( 3 );
-    /****************************************************************/
+    //################################################################
     double uMH = 0.0;
     double aMH = 0.0;
-    //double phip = 0.0;
-    //double sigmap = 0.0;
-
-    double HMtheta1 = -logpost_theta( theta_cur, h, T ) + 0.5 * log( det(G) ) + 0.5 * aux[0];
+    double HMtheta1 = - logpost_theta( theta_cur, h, T ) + 0.5 * log( det(G) ) + 0.5 * aux[0];
     double HMthetaf = 0.0;
 
     vec gradHMCth1 = zeros<mat>(3, 1);
@@ -177,27 +172,30 @@ vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &a
     vec theta1b;
     theta1a = theta1c;
     pa = pc;
-    /**********************************************************/
-    /**********************************************************/
+    //################################################################
+    //################################################################
+    // Generalized Leapfrog function
+	
     for( int jgl = 1 ; jgl < L + 1 ; jgl++ ){
 	
 	gdpth1 = glogpost_theta( theta1a, h, inv_G, dG_mu, dG_omega, dG_gamma, T);
     	gradHMCth1 = gdpth1 - 0.5 * nuH_theta( dG_mu, dG_omega, dG_gamma, inv_G, pa );
     
-    	/****************************************/
-    	/***** pn+1/2 *****************************/
+    	//######################################################
+    	//###################### pn + 1/2 ######################
 	
     	for( int jfix = 1; jfix < fixp + 1 ; jfix++ ){
         	pb = pa - 0.5 * eps * gradHMCth1;
         	gradHMCth1 = gdpth1 - 0.5 * nuH_theta( dG_mu, dG_omega, dG_gamma, inv_G, pb );
     	}
     
-    	/**********************************************************/
+    	//######################################################
+	//######################################################
     	G_theta( theta1a, G, inv_G, dG_mu, dG_omega, dG_gamma, T );
     	gdmom1 = gradHmom_theta( inv_G, pb);
     	gdmom2 = gradHmom_theta( inv_G, pb);
-    	/****************************************************/
-    	/****thetan+1****************************************/
+    	//######################################################
+    	//##################### theta + 1 ######################
 
     	for( int jfix = 1; jfix < fixp + 1; jfix ++ ){
         
@@ -206,7 +204,7 @@ vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &a
         	gdmom2 = gradHmom_theta( inv_G, pb );
         
     	}
-    /*************************************************************/
+    	//######################################################
     	gdpth1 = glogpost_theta( theta1b, h, inv_G, dG_mu, dG_omega, dG_gamma, T);
     	gradHMCth1 = gdpth1 - 0.5 * nuH_theta( dG_mu, dG_omega, dG_gamma, inv_G, pb );
     	pb = pb - 0.5 * eps * gradHMCth1;
@@ -225,13 +223,10 @@ vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &a
     if ( uMH < aMH ){ 
         theta1 = theta1b;
         acc ++; 
-        }
-    else{ 
+        }else{ 
         theta1 = theta_cur;
         }
 
-    /**********************************************************/
-    /**********************************************************/
     return theta1;
 }
 
@@ -301,10 +296,7 @@ double G_b(vec b, vec h, mat &G, mat &inv_G, mat& dG_b0, mat &dG_delta, mat &dG_
   dG_b0 = zeros<mat>(3, 3);
   dG_delta = zeros<mat>(3, 3);
   dG_b2 = zeros<mat>(3, 3);
-
-  //G(0,0) = sum( exp( - h( span(0, T-1), 0) ) ) +  1 / ( s_b0 * s_b0) ;
-  //G(2,2) = sum( exp( h( span(0, T-1), 0) ) ) +  1 / ( s_b2 * s_b2 );
-  //G(1, 2) = ( 1 - b1 * b1 ) * sum( y_T( span(0, T - 1), 0 ) );
+	
   G(0, 0) = sum( exp( - h ) ) + 1 / ( s_b0 * s_b0 );
   G(2, 2) = sum( exp( h ) ) + 1 / ( s_b2 * s_b2 );
   G(1, 2) = ( 1 - b1 * b1 ) * sum( y_T.subvec(0, T - 1 ) );
@@ -421,8 +413,7 @@ vec rmhmc_b(vec b_cur, vec h, int fixp, int L, double eps, int T, vec y_T , int 
     if( uMH < aMH ){
     	b = theta2b;
     	acc++;
-    }
-    else{
+    }else{
     	b = b_cur;
     }
 
@@ -431,9 +422,8 @@ vec rmhmc_b(vec b_cur, vec h, int fixp, int L, double eps, int T, vec y_T , int 
 
 
 double logpost_h(vec h, vec theta, vec b, int T, vec y_T){
-  //#h = (h1, ..., hT)
-  //#param = (y, l, theta, b)
-  
+  //h = (h1, ..., hT)
+ 
   double L = 0.0; 
   double mu = theta[0];
   double phi = tanh( theta[1] );
@@ -489,17 +479,15 @@ vec hmc_h(vec h_cur, vec theta, vec b, int L, double eps, int T, vec y_T, int &a
 
     vec vH = zeros<vec>(T , 1);
     vec pcur = mvrgaussian( T );
-    //vec pcur = zeros<vec>(T, 1);
-    //pcur(span(1, T), 0) = mvrgaussian( T );
-
+   
     double Hm1 = 0.0;
     double Hmf = 0.0;
     double uMH = 0.0;
     double aMH = 0.0;
-    //vec  auxp = pcur( span(1, T), 0).t() * pcur( span(1, T), 0);
+   
     vec auxp = pcur.t() * pcur;
     Hm1 = - logpost_h( h_cur, theta, b, T, y_T) + 0.5 * auxp[0];
-    //int jlp=1;
+    
     vec pa = pcur;
     vec pb = pcur;
     vec vHa = h_cur;
@@ -515,7 +503,6 @@ vec hmc_h(vec h_cur, vec theta, vec b, int L, double eps, int T, vec y_T, int &a
     	
     }
     
-    //auxp = pb( span(1, T), 0).t() * pb( span(1, T), 0);
     auxp = pb.t() * pb;
     Hmf = - logpost_h( vHb, theta, b, T, y_T) + 0.5 * auxp[0];
 
