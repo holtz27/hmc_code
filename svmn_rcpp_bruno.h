@@ -18,7 +18,7 @@ double G_theta(vec theta, mat &G, mat &inv_G, mat &dG_mu, mat &dG_omega, mat &dG
 vec nuH_theta(mat dG_mu, mat dG_omega, mat dG_gamma, mat inv_G, vec p);
 vec gradHmom_theta(mat inv_G, vec p);
 // hmc update
-vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, double &acc);
+vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &acc);
 
 
 // beta
@@ -33,14 +33,10 @@ vec gradHmom_b(mat inv_G, vec p);
 // hmc update
 vec rmhmc_b(vec b_cur, vec h, int fixp, int L, double eps, int T, vec y_T , int &acc);
 
-/*
 // h
 // Model functions
-double lpostvH(vec vH,vec theta1,vec theta2);
-vec gradlpvH(vec vH,vec theta1,vec theta2);
+double logpost_h(vec h, vec theta, vec b, int T, vec y_T);
+vec glogpost_h(vec h, vec theta, vec b, int T, vec y_T);
 // hmc update
-vec updatevH(vec vHprev,vec theta1,vec theta2,int nlpgrog,double epsilon);
-
-*/
-
+vec hmc_h(vec h_cur, vec theta, vec b, int L, double eps, int T, vec y_T, int &acc);
 #endif // SVMN_RCPP_BRUNO_H_INCLUDED
