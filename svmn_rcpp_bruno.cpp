@@ -140,7 +140,7 @@ vec nuH_theta(mat dG_mu, mat dG_omega, mat dG_gamma, mat inv_G, vec p){
     return nuH;
 }
 
-vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, double &acc){
+vec rmhmc_theta(vec theta_cur, vec h, int fixp, int L, double eps, int T, int &acc){
   
     vec theta1p = zeros<vec>(3, 1);
     vec theta1 = zeros<vec>(3, 1);
