@@ -39,4 +39,5 @@ double logpost_h(vec h, vec theta, vec b, int T, vec y_T);
 vec glogpost_h(vec h, vec theta, vec b, int T, vec y_T);
 // hmc update
 vec hmc_h(vec h_cur, vec theta, vec b, int L, double eps, int T, vec y_T, int &acc);
+
 #endif // SVMN_RCPP_BRUNO_H_INCLUDED
