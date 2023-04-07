@@ -430,92 +430,105 @@ vec rmhmc_b(vec b_cur, vec h, int fixp, int L, double eps, int T, vec y_T , int 
 }
 
 
-/*
-double lposth(vec h, vec theta1, vec theta2, int g_dim, vec vY){
-    double lpost=0.0;
-
-    double mu=theta1[0];
-    double phi=tanh(theta1[1]);
-    double sigma=exp(theta1[2]);
-    double beta0=theta2[0];
-    double beta1=tanh(theta2[1]);
-    double beta2=theta2[2];
-
-    lpost+=(-0.5 * sum( h( span(0, g_dim-1), 0) ) );
-    lpost+=(-0.5*(1-phi*phi)/(sigma*sigma))*(h[0]-mu)*(h[0]-mu);
-    //int j=1;
-    for ( int j = 1 ; j < g_dim ; j++ ){
-        lpost+=(-0.5*exp(-h[j-1])*(vY[j]-beta0-beta1*vY[j-1]-beta2*exp(h[j-1]))*(vY[j]-beta0-beta1*vY[j-1]-beta2*exp(h[j-1])));
-        lpost+=((-0.5/(sigma*sigma))*(h[j]-mu-phi*(h[j-1]-mu))*(h[j]-mu-phi*(h[j-1]-mu)));
-    }
-    lpost+=(-0.5*exp(-h[g_dim-1])*(vY[g_dim]-beta0-beta1*vY[g_dim-1]-beta2*exp(h[g_dim - 1]))*(vY[g_dim]-beta0-beta1*vY[g_dim-1]-beta2*exp(h[g_dim-1])));
-    return lpost;
+double logpost_h(vec h, vec theta, vec b, int T, vec y_T){
+  //#h = (h1, ..., hT)
+  //#param = (y, l, theta, b)
+  
+  double L = 0.0; 
+  double mu = theta[0];
+  double phi = tanh( theta[1] );
+  double sigma = exp( theta[2] );
+  double b0 = b[0];
+  double b1 = tanh( b[1] );
+  double b2 = b[2];
+  
+ 
+  L +=  - 0.5 * sum( h );
+ 
+  for( int j = 1 ; j < T ; j++ ){
+    L += - 0.5 / ( sigma * sigma ) * ( h[j] - mu - phi * (h[j-1] - mu) ) * ( h[j] - mu - phi * (h[j-1] - mu) );
+    L += - 0.5 * exp( -h[j] ) * ( y_T[j+1] - b0 - b1 * y_T[j] - b2 * exp( h[j]) ) * ( y_T[j+1] - b0 - b1 * y_T[j] - b2 * exp(h[j]) );
+  }
+  
+  L += - 0.5 * exp( -h[0] ) * ( y_T[1] - b0 - b1 * y_T[0] - b2 * exp( h[0]) ) * ( y_T[1] - b0 - b1 * y_T[0] - b2 * exp(h[0]) );
+  L += - 0.5 * (1 - phi * phi ) * ((h[0] - mu)/sigma) * ((h[0] - mu)/sigma);
+  
+  return L;
 }
-vec gradlph(vec h, vec theta1, vec theta2, int g_dim, vec vY){
+
+vec glogpost_h(vec h, vec theta, vec b, int T, vec y_T){
+  //h = (h1, ..., hT)
     
-    vec gradh=zeros<vec>(g_dim,1);
-
-    double mu=theta1[0];
-    double phi=tanh(theta1[1]);
-    double sigma=exp(theta1[2]);
-    double beta0=theta2[0];
-    double beta1=tanh(theta2[1]);
-    double beta2=theta2[2];
-    double auxy=0.0;
-
-    auxy = ( vY[1]-beta0-beta1*vY[0]-beta2*exp(vH[0]) );
-    gradvH[0]=-0.5+0.5*exp(-vH[0])*auxy*auxy+beta2*auxy-((1-phi*phi)/(sigma*sigma))*(vH[0]-mu)+(phi/(sigma*sigma))*(vH[1]-mu-phi*(vH[0]-mu));
-
-    //int j=2;
-    for ( int j = 1 ; j < g_dim - 1 ; j++ ){
-        auxy = vY[j+1]-beta0-beta1*vY[j]-beta2*exp(vH[j]);
-        gradvH[j] = -0.5 + 0.5*exp(-vH[j])*(auxy*auxy) + beta2 * auxy + (phi/(sigma*sigma))*(vH[j+1]-mu-phi*(vH[j]-mu))-(1/(sigma*sigma))*(vH[j]-mu-phi*(vH[j-1]-mu));
-    }
-
-    auxy=(vY[g_dim]-beta0-beta1*vY[g_dim-1]-beta2*exp(vH[g_dim-1]));
-    gradvH[g_dim-1]=-0.5+0.5*exp(-vH[g_dim-1])*auxy*auxy  + beta2 * auxy - (1/(sigma*sigma))*(vH[g_dim-1]-mu-phi*(vH[g_dim-2]-mu));
-
-    return gradvH;
+  double mu = theta[0];
+  double phi = tanh( theta[1] );
+  double sigma = exp(theta[2]);
+  double b0 = b[0];
+  double b1 = tanh( b[1] );
+  double b2 = b[2];
+  
+  //# construindo o vetor s
+  vec r  = zeros<vec>(T, 1);
+  vec mu_t = y_T.subvec(1, T) - b0 - b1 * y_T.subvec(0, T - 1) - b2 * exp( h );
+  
+  vec s = - 0.5 + 0.5 * exp( -h ) % mu_t % mu_t + b2 * mu_t;
+  
+  //# construindo o vetor r
+  r[0] += ( h[0] - phi * h[1] - mu * (1 - phi) ) / (sigma * sigma);
+  r[T-1] = 1 / (sigma * sigma) * (h[T-1] - mu - phi * (h[T-2] - mu) );
+  
+  vec u = h.subvec(1, T - 2);
+  vec v = h.subvec(2, T - 1) + h.subvec(0, T - 3);
+  
+  r.subvec(1, T-2) += (1 + phi * phi ) * u - phi * v - mu * (1 - phi) * (1 - phi);
+  r.subvec(1, T-2) /= sigma * sigma ;
+  
+  return s - r;
 }
-vec updatevH(vec vHprev,vec theta1,vec theta2,int nlpgrog,double eps, int g_dim, vec vY){
-    vec vH=zeros<vec>(g_dim+1,1);
-    vec pcur=zeros<vec>(g_dim+1,1);
-    pcur(span(1,g_dim),0)=mvrgaussian(g_dim);
 
-    double Hm1=0.0;
-    double Hmf=0.0;
-    double uMH=0.0;
-    double aMH=0.0;
-    vec  auxp=pcur(span(1,g_dim),0).t()*pcur(span(1,g_dim),0);
-    Hm1=-lpostvH(vHprev,theta1,theta2, g_dim, vY)+0.5*auxp[0];
-    int jlp=1;
-    vec pa=pcur;
-    vec pb=pcur;
-    vec vHa=vHprev;
-    vec vHb=vHprev;
-    for (jlp=1;jlp<nlpgrog+1;jlp++){
-    pb=pa+0.5*eps*gradlpvH(vHa,theta1,theta2, g_dim, vY);
-    //cout<<gradlpvH(vHa,theta1,theta2)<<endl;
-    //cin>>sk;
-    vHb=vHa+eps*pb;
-    pb=pb+0.5*eps*gradlpvH(vHb,theta1,theta2, g_dim, vY);
-    //cout<<+gradlpvH(vHb,theta1,theta2)<<endl;
-    vHa=vHb;
-    pa=pb;
+vec hmc_h(vec h_cur, vec theta, vec b, int L, double eps, int T, vec y_T, int &acc){
+
+    vec vH = zeros<vec>(T , 1);
+    vec pcur = mvrgaussian( T );
+    //vec pcur = zeros<vec>(T, 1);
+    //pcur(span(1, T), 0) = mvrgaussian( T );
+
+    double Hm1 = 0.0;
+    double Hmf = 0.0;
+    double uMH = 0.0;
+    double aMH = 0.0;
+    //vec  auxp = pcur( span(1, T), 0).t() * pcur( span(1, T), 0);
+    vec auxp = pcur.t() * pcur;
+    Hm1 = - logpost_h( h_cur, theta, b, T, y_T) + 0.5 * auxp[0];
+    //int jlp=1;
+    vec pa = pcur;
+    vec pb = pcur;
+    vec vHa = h_cur;
+    vec vHb = h_cur;
+    
+    for (int jlp = 1 ; jlp < L + 1 ; jlp++ ){
+    
+    	pb = pa + 0.5 * eps * glogpost_h( vHa, theta, b, T, y_T);
+    	vHb = vHa + eps * pb;
+    	pb = pb + 0.5 * eps * glogpost_h( vHb, theta, b, T, y_T);
+    	vHa = vHb;
+    	pa = pb;
+    	
     }
-    auxp=pb(span(1,g_dim),0).t()*pb(span(1,g_dim),0);
-    Hmf=-lpostvH(vHb,theta1,theta2, g_dim, vY)+0.5*auxp[0];
+    
+    //auxp = pb( span(1, T), 0).t() * pb( span(1, T), 0);
+    auxp = pb.t() * pb;
+    Hmf = - logpost_h( vHb, theta, b, T, y_T) + 0.5 * auxp[0];
 
-    aMH=std::min(1.0,exp(-Hmf+Hm1));
-    //cout<<aMH<<endl;
-    //cin>>sk;
-    //uMH=gsl_rng_uniform(r);
+    aMH = std::min( 1.0, exp( - Hmf + Hm1 ) );
     uMH = randu( distr_param( 0, 1 ) );
-    if(uMH<aMH){vH=vHb;}
-    else {vH=vHprev;}
+    
+    if( uMH < aMH ){
+    	vH = vHb;
+    	acc++;
+    }else{
+        vH = h_cur;
+    }
     
 
     return vH;
 }
-
-*/
