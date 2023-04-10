@@ -1,90 +1,66 @@
 ################################################################################
 #### librarys
 library(ggplot2)
-################################################################################
-path = 'Área de Trabalho/Mestrado/Projeto/Projeto II/Simulação/Modelos/normal/normal_model.cpp'
-Rcpp::sourceCpp(path)
-################################################################################
-y_T = c(y0, y)
-theta_init = c( 1, atanh( 0.8 ), log( 0.5 ) )
-b_init = c( mean(y), atanh( 0.8 ), 2 )
-h_init = rep( 0, length(y) )
 
-init = c( theta_init,
-          b_init,
-          h_init )
+Rcpp::sourceCpp('run_svmn_rcpp_bruno.cpp')
 
-param = list(y_T = c(y0, y),
-             theta = theta_init,
-             b = b_init,
-             h = h_init,
-             mu_0 = 0, s_0 = 3.2, 
-             a_phi = 20, b_phi = 1.5, 
-             a_s = 2, b_s = 10,
-             mu_b0 = 0, s_b0 = 3.2, 
-             a_b1 = 5, b_b1 = 1.5, 
-             mu_b2 = 0, s_b2 = 3.2,
-             seed = 0)
-N = 1e3
-x = normal_svm_smn(N, T,
-                  eps_theta = c(0.1, 0.1, 0.1), min_L_theta = 20, max_L_theta = 20,
-                  eps_b = c(0.1, 0.1, 0.1), min_L_b = 20, max_L_b = 20,
-                  eps_h = 0.01, min_L_h = 10, max_L_h = 10,
-                  init, 
-                  param)
+N = 1e4
+samples = svmn(N,
+               L_theta = 20, eps_theta = 0.5,
+               L_b = 20, eps_b = 0.1,
+               L_h = 50, eps_h = 0.015,
+               y_T = c(y0, y),
+               seed = 0
+               )
 
-x$acc / N
-x$time
-chain = unlist(x$chain)
+samples$time / 60
+samples$acc / N
 
-sum( is.na( chain ) )
-
-theta_init = chain[1:3, N + 1]
-b_init = chain[4:6, N + 1]
-h_init = chain[7:(T + 6), N + 1]
-init = c(theta_init,
-         b_init,
-         h_init)
+theta_chain = samples$chain$chain_theta
+b_chain     = samples$chain$chain_b
+h_chain     = samples$chain$chain_h
 
 # Transformations
-chain[2, ] = tanh( chain[2, ] )
-chain[3, ] = exp( chain[3, ] )
-chain[5, ] = tanh( chain[5, ] )
-chain[7, ] = exp( chain[7, ] )
+theta_chain[2, ] = tanh( theta_chain[2, ] )
+theta_chain[3, ] = exp( theta_chain[3, ] )
+b_chain[2, ]     = tanh( b_chain[2, ] )
+
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 0
-burned = as.matrix(chain[, -c(1:burn)])
+burn = 1e3
+# Jumps
+lags = 10
+jumps = seq(1, N - burn, by = lags)
+
 ###############################################################################
 ###############################################################################
 ############################### theta
+theta_burned = as.matrix( theta_chain[, -c( 1:burn )] )
+theta_burned_lag = theta_burned[, jumps]
+
+#par(mfrow = c(2, 2))
+#plot(theta_burned[1, ], type = 'l', main = 'mu')
+#plot(acf(theta_burned[1, ], lag.max = 100, plot = FALSE)[1:100])
+#plot(theta_burned[2, ], type = 'l', main = 'phi')
+#plot(acf(theta_burned[2, ], lag.max = 100, plot = FALSE)[1:100])
+#plot(theta_burned[3, ], type = 'l', main = 'sigma')
+#plot(acf(theta_burned[3, ], lag.max = 100, plot = FALSE)[1:100])
+#par(mfrow = c(1, 1))
 
 par(mfrow = c(2, 2))
-plot(burned[1, ], type = 'l', main = 'mu')
-plot(acf(burned[1, ], lag.max = 100, plot = FALSE)[1:100])
-plot(burned[2, ], type = 'l', main = 'phi')
-plot(acf(burned[2, ], lag.max = 100, plot = FALSE)[1:100])
-plot(burned[3, ], type = 'l', main = 'sigma')
-plot(acf(burned[3, ], lag.max = 100, plot = FALSE)[1:100])
-par(mfrow = c(1, 1))
-# Jumps
-lags = 1
-jumps = seq(1, N - burn, by = lags)
-burned_lag = burned[, jumps]
-par(mfrow = c(2, 2))
-plot(burned_lag[1, ], type = 'l')
-plot(acf(burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
-plot(burned_lag[2, ], type = 'l')
-plot(acf(burned_lag[2, ], lag.max = 100, plot = FALSE)[1:100])
-plot(burned_lag[3, ], type = 'l')
-plot(acf(burned_lag[3, ], lag.max = 100, plot = FALSE)[1:100])
+plot(theta_burned_lag[1, ], type = 'l', main = 'mu')
+plot(acf(theta_burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
+plot(theta_burned_lag[2, ], type = 'l', main = 'phi')
+plot(acf(theta_burned_lag[2, ], lag.max = 100, plot = FALSE)[1:100])
+plot(theta_burned_lag[3, ], type = 'l', main = 'sigma')
+plot(acf(theta_burned_lag[3, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
 
-N_new = length( burned_lag[1, ] )
+N_new = length( theta_burned_lag[1, ] )
 
 ############### Análise numérica
-mcmcchain_theta = coda::as.mcmc( t( burned_lag[1:3, ] ) )
+mcmcchain_theta = coda::as.mcmc( t( theta_burned_lag ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_theta = coda::geweke.diag( mcmcchain_theta )
@@ -97,26 +73,29 @@ IF_theta = N_new / N_eff_theta
 IF_theta
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_theta = round( apply( burned_lag[1:3, ], 
+mc_error_theta = round( apply( theta_burned_lag, 
                                MARGIN = 1, 
-                               FUN = sd) / sqrt( N_eff_theta ), 5 )
+                               FUN = sd) / sqrt( N_eff_theta ), 
+                        5 )
 mc_error_theta
 
 ###############################################################################
 ###############################################################################
 ############################### b
+b_burned = as.matrix( b_chain[, -c( 1:burn )] )
+b_burned_lag = b_burned[, jumps]
 
 par(mfrow = c(2, 2))
-plot(burned_lag[4, ], type = 'l', main = 'b0')
-plot(acf(burned_lag[4, ], lag.max = 100, plot = FALSE)[1:100])
-plot(burned_lag[5, ], type = 'l', main = 'b1')
-plot(acf(burned_lag[5, ], lag.max = 100, plot = FALSE)[1:100])
-plot(burned_lag[6, ], type = 'l', main = 'b2')
-plot(acf(burned_lag[6, ], lag.max = 100, plot = FALSE)[1:100])
+plot(b_burned_lag[1, ], type = 'l', main = 'b0')
+plot(acf(b_burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
+plot(b_burned_lag[2, ], type = 'l', main = 'b1')
+plot(acf(b_burned_lag[2, ], lag.max = 100, plot = FALSE)[1:100])
+plot(b_burned_lag[3, ], type = 'l', main = 'b2')
+plot(acf(b_burned_lag[3, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
 
 ############### Análise numérica
-mcmcchain_b = coda::as.mcmc( t( burned_lag[4:6, ] ) )
+mcmcchain_b = coda::as.mcmc( t( b_burned_lag ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_b = coda::geweke.diag( mcmcchain_b )
@@ -129,22 +108,26 @@ IF_b = N_new / N_eff_b
 IF_b
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_b = round( apply( burned_lag[4:6, ], 
+mc_error_b = round( apply( b_burned_lag, 
                            MARGIN = 1, 
-                           FUN = sd) / sqrt( N_eff_b ), 5 )
+                           FUN = sd) / sqrt( N_eff_b ), 
+                    5 )
 mc_error_b
 
 ###############################################################################
 ###############################################################################
 ############################### h
-H = burned_lag[7:(T + 6), ]
+h_burned = as.matrix( h_chain[, -c( 1:burn )] )
+h_burned_lag = h_burned[, jumps]
+
+H = h_burned_lag
 h_hat = apply(H, MARGIN = 1, FUN = mean)
 h_min = apply(H, MARGIN = 1, FUN = quantile, probs = c(0.025) )
 h_max = apply(H, MARGIN = 1, FUN = quantile, probs = c(0.975) )
 data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
 data = data.frame(data)
 names(data) = c('obs', 'vdd', 'media', 'min','max')
-g = ggplot(data[100:250, ]) 
+g = ggplot(data[1:250, ]) 
 g = g + geom_line(aes(obs, media))
 g = g + geom_line(aes(obs, vdd), color = 'red')
 g = g + geom_line(aes(obs, min), linetype = 'dashed')
@@ -156,6 +139,8 @@ mcmcchain_h = coda::as.mcmc( t( H ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_h = coda::geweke.diag( mcmcchain_h )
+# Espera-se que 95% desdes valores estejam no intervalo ( -1.96 , 1.96 )
+geweke = sum( abs( CD_h$z ) < 1.96 ) / T
 ####### Fator de ineficiência (IF)
 # IF = N / N_eff, onde N_eff = effective Sample Size
 # Se IF >> 1, indica uma má mistura da cadeia gerada
@@ -163,18 +148,19 @@ N_eff_h = coda::effectiveSize( mcmcchain_h )
 IF_h = N_new / N_eff_h
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_h = round( apply( burned_lag[7:(T + 6), ], 
+mc_error_h = round( apply( H, 
                            MARGIN = 1, 
-                           FUN = sd) / sqrt( N_eff_h ), 5 )
+                           FUN = sd) / sqrt( N_eff_h ), 
+                    5 )
 
 # plots
 par( mfrow = c(1,3) )
-plot( CD_h$z )
+plot( CD_h$z, main = 'Geweke diagnostic' )
 abline(h = -1.96)
 abline(h = 1.96)
-plot( IF_h )
+plot( IF_h, main = 'Inefficiency factors' )
 abline(h = 1)
-plot( mc_error_h )
+plot( mc_error_h, main = 'MCMC errors' )
 par( mfrow = c(1,1) )
 
 ###############################################################################
@@ -218,15 +204,15 @@ dic = function(data, theta_draws, theta_hat){
   return( DIC )
 } 
 
-b_hat = c(mean( burned_lag[4, ] ),
-          mean( burned_lag[5, ] ),
-          mean( burned_lag[6, ] )
+b_hat = c(mean( b_burned_lag[1, ] ),
+          mean( b_burned_lag[2, ] ),
+          mean( b_burned_lag[3, ] )
 )
 
 theta_hat = c( b_hat, h_hat )
 
 dic( data = c(y0,y), 
-     theta_draws = burned_lag, 
+     theta_draws = theta_burned_lag, 
      theta_hat )
 
 ############### loo
@@ -255,7 +241,7 @@ r_eff = loo::relative_eff(lik,
                           data_ = y,
                           data_past = c( y0, y[1:(T-1)] ),
                           cores = getOption('mc.cores', 3)
-                         )
+)
 
 
 # or set r_eff = NA
