@@ -2,16 +2,26 @@
 
 #include "svmn.h"
 
+// ############################## set seed function
+void set_seed(int seed){
+  Rcpp::Environment base_env( "package:base" );
+  Rcpp::Function set_seed_r = base_env[ "set.seed" ];
+  set_seed_r( std::floor( std::fabs( seed ) ) );
+}
+
 // [[Rcpp::export]]
 List svmn(int N, 
            int L_theta, double eps_theta,
            int L_b, double eps_b, 
            int L_h, double eps_h,
-           vec y_T
+           vec y_T, 
+           int seed
            ){
   
   wall_clock timer;
   timer.tic();
+  
+  if( !( seed == 0 ) ) set_seed( seed );
   
   int T = y_T.n_elem - 1, a = floor( 0.1 * N );
   
