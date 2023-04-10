@@ -344,8 +344,6 @@ vec rmhmc_b(vec b_cur, vec h, int fixp, int L, double eps, int T, vec y_T , int 
     
     vec theta2p = zeros<vec>(3, 1);
     vec b = zeros<vec>(3, 1);
-    int jfix = 1;
-    int jgl = 1;
     mat inv_G = zeros<mat>(3, 3);
     mat dG_b0 = zeros<mat>(3, 3);
     mat dG_delta = zeros<mat>(3, 3);
