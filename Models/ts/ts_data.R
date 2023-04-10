@@ -1,1 +1,38 @@
-1
+############################################################################
+################################# SVM-SMN Model ############################
+# y_t = b0 + b1 * y_{t-1} + b2 * e(h_t) + e_t/lambda_t^{1/2}
+# h_t = mu + phi * ( h_{t-1} - mu ) + sigma * n_{t}
+############################################################################
+###################### t-Student: lambda|v ~ Gama(v/2, v/2) 
+
+mu = -1
+phi = 0.95
+sigma = 0.25
+b0 = 0.001
+b1 = 0.1
+b2 = -0.2
+y0 = 0
+v = 10
+T = 3e3
+y = h = l = rep(0, T)
+
+set.seed(4225873)
+for(t in 1:T){
+  if(t == 1){
+    l[t] = rgamma(1, shape = v/2, rate = v/2)
+    h[t] = rnorm(1, mean = mu, sd = sigma*sqrt(1/(1-phi**2)))
+    y[t] = rnorm(1, b0 + b1*y0 + b2*exp(h[t]), exp(h[t]/2)*sqrt(l[t]))
+  }else{
+    l[t] = rgamma(1, shape = v/2, rate = v/2)
+    h[t] = rnorm(1, mean = (mu + phi*(h[t-1]-mu)), sd = sigma)
+    y[t] = rnorm(1, b0 + b1* y [t-1] + b2*exp(h[t]), exp(h[t]/2)*sqrt(l[t]))
+  }
+}
+
+par(mfrow=c(1, 2))
+plot(y, type = 'l', main = mean(y))
+hist(y, breaks = 40)
+par(mfrow=c(1, 1))
+
+
+
