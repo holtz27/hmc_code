@@ -2,45 +2,57 @@
 
 #include "svm_smn_ts.h"
 
+// ############################## set seed function
+void set_seed( int seed ){
+  Rcpp::Environment base_env("package:base");
+  Rcpp::Function set_seed_r = base_env["set.seed"];
+  set_seed_r( std::floor( std::fabs( seed ) ) );
+}
+
 // [[Rcpp::export]]
 List svm_smn_ts(int N, 
-                int L_theta, double eps_theta,
-                int L_b, double eps_b, 
-                int L_h, double eps_h,
-                int L_v, double eps_v,
-                vec y_T
-){
+                int L_theta, double eps_theta, vec theta_init,
+                int L_b, double eps_b, vec b_init,
+                int L_h, double eps_h, vec h_init, 
+                int L_v, double eps_v, double v_init, 
+                vec y_T, int seed ){
   
   wall_clock timer;
   timer.tic();
+  
+  if( seed != 0 ) set_seed( seed );
   
   int T = y_T.n_elem - 1, a = floor( 0.1 * N );
   
   // iniciando theta
   int acc_theta = 0;
-  vec theta_cur = zeros<vec>(3, 1);
-  theta_cur[ 0 ] += 0.005;
-  theta_cur[ 1 ] += 0.5 * ( log( 1 + 0.98 ) - log( 1 - 0.98 ) );
-  theta_cur[ 2 ] += log( sqrt( 0.017 ) );
+  vec theta_cur = theta_init;
+  //vec theta_cur = zeros<vec>(3, 1);
+  //theta_cur[ 0 ] += 0.005;
+  //theta_cur[ 1 ] += 0.5 * ( log( 1 + 0.98 ) - log( 1 - 0.98 ) );
+  //theta_cur[ 2 ] += log( sqrt( 0.017 ) );
   
   // iniciando h
   int acc_b = 0;
-  vec h_cur = zeros<vec>(T, 1);
-  h_cur[ 0 ] += 0.005 + sqrt( 0.03 ) / (1 - 0.95 * 0.95 ) * randn();
-  for( int kt = 1 ; kt < T ; kt++ ){
-    h_cur[ kt ] += 0.005 + 0.95 * ( h_cur[ kt - 1 ] -0.005 ) + sqrt( 0.03 ) * randn();
-  }
+  vec h_cur = h_init;
+  //vec h_cur = zeros<vec>(T, 1);
+  //h_cur[ 0 ] += 0.005 + sqrt( 0.03 ) / (1 - 0.95 * 0.95 ) * randn();
+  //for( int kt = 1 ; kt < T ; kt++ ){
+  //  h_cur[ kt ] += 0.005 + 0.95 * ( h_cur[ kt - 1 ] -0.005 ) + sqrt( 0.03 ) * randn();
+  //}
   
   // iniciando b
   int acc_h = 0;
-  vec b_cur = zeros<vec>(3, 1);
-  b_cur[ 0 ] += 0.3;
-  b_cur[ 1 ] += 0.5 * ( log( 1 + 0.03 ) - log( 1 - 0.03 ) );
-  b_cur[ 2 ] += -0.025;
+  vec b_cur = b_init;
+  //vec b_cur = zeros<vec>(3, 1);
+  //b_cur[ 0 ] += 0.3;
+  //b_cur[ 1 ] += 0.5 * ( log( 1 + 0.03 ) - log( 1 - 0.03 ) );
+  //b_cur[ 2 ] += -0.025;
   
   // iniciando v
   int acc_v = 0;
-  double v_cur = 0.0;
+  double v_cur = v_init;
+  //double v_cur = log( 40 );
   
   // iniciando l
   vec l_cur = zeros<vec>(T, 1);
