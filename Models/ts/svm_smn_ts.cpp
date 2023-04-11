@@ -695,12 +695,11 @@ vec l_gibbs(double e, vec y_T, vec h, vec b, int T){
   
   vec aux = y_T.subvec( 1, T ) - b0 - b1 * y_T.subvec( 0, T - 1 ) - b2 * exp( h );
   vec u = exp( - h ) % aux % aux;
-  
-  
-  for( int i = 0; i < T; i++ ){
-    l_out[ i ] = R::rgamma( 0.5 * (v + 1), 2 / ( u[i] + v ) ); 
-    //randg( distr_param(a,b) )
-    //l_out[ i ] = randg(1, distr_param( 0.5 * (v + 1), 2 / ( u[i] + v ) ) ) ; 
+  //R::rgamma( shape, scale = 1 / rate)
+  //scale = 1 / 0.5 * ( u[ i ] + v ) = 2.0 / ( u[ i ] + v )
+
+  for( int i = 0 ; i < T ; i++ ){
+    l_out[ i ] = R::rgamma( 0.5 * (v + 1), 2.0 / ( u[ i ] + v ) ); 
   }
   
   return l_out;
