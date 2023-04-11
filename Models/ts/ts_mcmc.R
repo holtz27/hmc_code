@@ -95,7 +95,6 @@ data_theta = matrix(
                     )
 row.names( data_theta ) = c('mu', 'phi', 'sigma')
 colnames( data_theta ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
-data_theta = round( data_theta, 5 )
 ###############################################################################
 ###############################################################################
 ############################### b
@@ -137,10 +136,9 @@ data_b = matrix(
                 CD_b$z,
                 IF_b,
                 mc_error_b), nrow = 3, byrow = FALSE
-)
+               )
 row.names( data_b ) = c('b0', 'b1', 'b2')
 colnames( data_b ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
-data_b = round( data_b, 5 )
 ###############################################################################
 ###############################################################################
 ############################### e = log( v )
@@ -174,10 +172,9 @@ data_e = matrix(
                 CD_e$z,
                 IF_e,
                 mc_error_e), nrow = 1, byrow = FALSE
-)
+               )
 row.names( data_e ) = c('e')
 colnames( data_e ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
-data_e = round( data_e, 5 )
 ###############################################################################
 ###############################################################################
 data = data_theta
@@ -203,13 +200,12 @@ f = f + geom_line(aes(obs, vdd), color = 'red')
 f = f + geom_line(aes(obs, min), linetype = 'dashed')
 f = f + geom_line(aes(obs, max), linetype = 'dashed')
 f
-
 ############### Análise numérica
 mcmcchain_l = coda::as.mcmc( t( chain_l ) ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_l = coda::geweke.diag( mcmcchain_l )
-# Espera-se que mais de 95% desdes valores estejam no intervalo ( -1.96 , 1.96 )
+# Fração de valores que est]ao no intervalo ( -1.96 , 1.96 )
 geweke_l = sum( abs( CD_l$z ) < 1.96 ) / T
 geweke_l
 ####### Fator de ineficiência (IF)
@@ -231,7 +227,6 @@ plot( IF_l, main = 'Inefficiency factors', xlab = '', ylab = '' )
 abline(h = 1)
 plot( mc_error_l, main = 'MCMC errors', xlab = '', ylab = '' )
 par( mfrow = c(1,1) )
-
 ###############################################################################
 ###############################################################################
 ############################### h
@@ -249,13 +244,12 @@ g = g + geom_line(aes(obs, vdd), color = 'red')
 g = g + geom_line(aes(obs, min), linetype = 'dashed')
 g = g + geom_line(aes(obs, max), linetype = 'dashed')
 g
-
 ############### Análise numérica
 mcmcchain_h = coda::as.mcmc( t( chain_h ) ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_h = coda::geweke.diag( mcmcchain_h )
-# Espera-se que 95% desdes valores estejam no intervalo ( -1.96 , 1.96 )
+# Fração de valores que est]ao no intervalo ( -1.96 , 1.96 )
 geweke_h = sum( abs( CD_h$z ) < 1.96 ) / T
 geweke_h
 ####### Fator de ineficiência (IF)
