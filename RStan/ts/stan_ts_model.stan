@@ -1,7 +1,7 @@
 data{
-  int < lower = 0 > T;
+  int<lower=0> T;
   real y0;
-  vector [ T ] y;
+  vector[T] y;
 }
 parameters{
   real mu;                                // mean log volatility
@@ -25,7 +25,6 @@ transformed parameters{
   phi = 2 * phiT - 1;
   b1 = 2 * b1T - 1;
   sigma = sqrt(s2);
-  
   
   //--- Volatilitys:
   h = h_std * sigma;
