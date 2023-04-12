@@ -7,7 +7,7 @@ parameters{
   real mu;                         // mean log volatility
   real<lower=-1,upper=1> phiT;     // persistence of volatility
   real<lower=0> s2;
-  vector[T] h_std;  // std log volatility time t
+  vector[T] h_std;                 // std log volatility time t
   real<lower=-1,upper=1> b1T;
   real b0;
   real b2;
