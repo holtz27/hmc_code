@@ -1,20 +1,21 @@
-#########################################################################################
 library(rstan)
 library(stringr)
 
 options(mc.cores = parallel::detectCores())
-path = 'Área de Trabalho/Mestrado/Projeto/Projeto II/Simulação/rstan/stan_model.stan'
+path = 'Área de Trabalho/Mestrado/Projeto/Projeto II/Simulação/algoritmo/rstan/ts/stan_ts_model.stan'
 model  = stan_model(path)
 
 # Running stan code
 T = length(y)
-M  = 1e3
+M  = 5e3
 fit = sampling(model, 
                list(T = T, 
                     y = y,
                     y0 = 0),
                iter = M,
-               chains = 4)
+               chains = 3,
+               control = list(metric = 'unit_e')
+               )
 
 #------------------ Save outputs
 #saveRDS(parameters, file = 'output_model_V')
@@ -26,9 +27,6 @@ x = summary(fit)
 Y = x$summary
 #------------------ Tratando Y
 Y = data.frame(Y, row.names = row.names(Y))
-row.names(Y) = str_replace(row.names(Y), pattern = 'b0_', '.b0')
-row.names(Y) = str_replace(row.names(Y), pattern = 'b1_', '.b1')
-row.names(Y) = str_replace(row.names(Y), pattern = 'b2_', '.b2')
 #------------------ Avaliando convergência
 rows = c('mu', 'phi', 'sigma', 'b0', 'b1', 'b2', 'v')
 cols = c('mean', 'sd', 'X2.5.', 'X97.5.', 'n_eff','Rhat')
@@ -37,17 +35,17 @@ data
 
 # h
 rhat_h = Y[str_detect(row.names(Y), pattern = '^h'),][, 'Rhat']
+plot(rhat_h, main = 'h')
+abline(h = 0.95)
+abline(h = 1)
+abline(h = 1.05)
+
 # l
 rhat_l = Y[str_detect(row.names(Y), pattern = '^l'),][, 'Rhat']
-
-par(mfrow=c(1,2))
-plot(rhat_h, main = 'h')
-abline(h=0.95)
-abline(h=1.05)
 plot(rhat_l, main = 'l')
-abline(h=0.95)
-abline(h=1.05)
-par(mfrow=c(1,1))
+abline(h = 0.95)
+abline(h = 1)
+abline(h = 1.05)
 
 # mu
 mu = parameters$mu
@@ -154,44 +152,14 @@ mc_error_b = round( apply( b, MARGIN = 2, FUN = sd) / sqrt( N_eff_b ), 5 )
 mc_error_b
 ################################################################################
 
-# v
-v = parameters$v
-par(mfrow=c(1,3))
-plot(v, type='l', main='', xlab='')
-hist(v, main=round(mean(v), 8), xlab='', col = 'white', breaks = 40)
-abline(v = mean(v), col = 'blue', lwd=2, lty=2)
-abline(v = Y['v', ]['X2.5.'], col = 'red', lwd=2, lty=2)
-abline(v = Y['v', ]['X97.5.'], col = 'red', lwd=2, lty=2)
-plot(acf(v, lag.max = 100, plot = FALSE)[1:100])
-par(mfrow=c(1,1)) 
-################################################################################
-############### Análise numérica
-#b = matrix( c( b0, b1, b2 ), ncol = 3 )
-mcmcchain_v = coda::as.mcmc( matrix(v, ncol = 1) )
-####### Geweke Statistic
-# |G| > 1.96 evidencia não convergencia
-CD_v = coda::geweke.diag( mcmcchain_v )
-CD_v
-####### Fator de ineficiência (IF)
-# IF = N / N_eff, onde N_eff = effective Sample Size
-# Se IF >> 1, indica uma má mistura da cadeia gerada
-N_eff_v = coda::effectiveSize( mcmcchain_v )
-IF_v = nrow(v) / N_eff_v
-IF_v
-####### MCMC error
-# MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_v = round( sd( v ) / sqrt( N_eff_v ), 5 )
-mc_error_v
-################################################################################
-
 # h
 chain_h = parameters$h
 h_hat = apply(chain_h, 2, mean)
 lim_inf = apply(chain_h, 2, quantile, probs=c(.025, .975))[1,]
 lim_sup = apply(chain_h, 2, quantile, probs=c(.025, .975))[2,]
-df = data.frame(x=1:T, ver = h, est = h_hat, 
+df.1 = data.frame(x=1:T, ver = h, est = h_hat, 
                 lim_inf = lim_inf, lim_sup = lim_sup)
-g = ggplot(df) 
+g = ggplot(df[1:250, ]) 
 g = g + geom_ribbon(aes(x, ymin = lim_inf, ymax = lim_sup), fill="gray80")
 g = g + geom_line(aes(x=x, y = ver), color ='red')
 g = g + geom_line(aes(x=x, y=est))
@@ -203,52 +171,62 @@ mcmcchain_h = coda::as.mcmc( chain_h )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_h = coda::geweke.diag( mcmcchain_h )
-plot( CD_h$z )
-abline(h = -1.96)
-abline(h = 1.96)
 ####### Fator de ineficiência (IF)
 # IF = N / N_eff, onde N_eff = effective Sample Size
 # Se IF >> 1, indica uma má mistura da cadeia gerada
 N_eff_h = coda::effectiveSize( mcmcchain_h )
-IF_h = nrow(chain_h) / N_eff_h
-plot( IF_h )
-abline(h = 1)
+IF_h = M / N_eff_h
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
 mc_error_h = round( apply( chain_h, MARGIN = 2, FUN = sd) / sqrt( N_eff_h ), 5 )
-plot( mc_error_h )
 
-####################################################################################
+# plots
+par( mfrow = c(1,3) )
+plot( CD_h$z )
+abline(h = -1.96)
+abline(h = 1.96)
+plot( IF_h )
+abline(h = 1)
+plot( mc_error_h )
+par( mfrow = c(1,1) )
+
+################################################################################
+
 # l
-burned_l_sim = parameters$l
-l_hat = apply(burned_l_sim, 2, mean)
-lim_inf = apply(burned_l_sim, 2, quantile, probs=c(.025, .975))[1,]
-lim_sup = apply(burned_l_sim, 2, quantile, probs=c(.025, .975))[2,]
-df.0 = data.frame(x=1:T, ver = l, est = l_hat, 
-                  lim_inf = lim_inf, lim_sup = lim_sup)
-g0 = ggplot(df.0) 
-g0 = g0 + geom_line(aes(x=x, y = est))
-g0 = g0 + geom_line(aes(x=x, y = ver), color ='red')
-g0 = g0 + geom_line(aes(x=x, y = lim_inf), linetype = 'dashed')
-g0 = g0 + geom_line(aes(x=x, y = lim_sup), linetype = 'dashed')
-g0
+chain_l = parameters$l
+l_hat = apply(chain_l, 2, mean)
+lim_inf = apply(chain_l, 2, quantile, probs=c(.025, .975))[1,]
+lim_sup = apply(chain_l, 2, quantile, probs=c(.025, .975))[2,]
+df.2 = data.frame(x=1:T, ver = l, est = l_hat, 
+                lim_inf = lim_inf, lim_sup = lim_sup)
+h = ggplot( df.2[1:100, ] ) 
+h = h + geom_ribbon(aes(x, ymin = lim_inf, ymax = lim_sup), fill="gray80")
+h = h + geom_line(aes(x=x, y = ver), color ='red')
+h = h + geom_line(aes(x=x, y=est))
+#g = g + geom_line(aes(x=x, y = lim_inf), linetype = 'dashed')
+#g = g + geom_line(aes(x=x, y = lim_sup), linetype = 'dashed')
+h
+
 ############### Análise numérica
-mcmcchain_l = coda::as.mcmc( burned_l_sim ) 
+mcmcchain_l = coda::as.mcmc( chain_l ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_l = coda::geweke.diag( mcmcchain_l )
-plot( CD_l$z )
-abline(h = -1.96)
-abline(h = 1.96)
 ####### Fator de ineficiência (IF)
 # IF = N / N_eff, onde N_eff = effective Sample Size
 # Se IF >> 1, indica uma má mistura da cadeia gerada
 N_eff_l = coda::effectiveSize( mcmcchain_l )
-IF_l = nrow( burned_l_sim ) / N_eff_l
-plot( IF_l )
-abline(h = 1)
+IF_l = M / N_eff_l
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_l = round( apply( burned_l_sim, MARGIN = 2, FUN = sd) / sqrt( N_eff_h ), 5 )
-plot( mc_error_l )
+mc_error_l = round( apply( chain_l, MARGIN = 2, FUN = sd) / sqrt( N_eff_l ), 5 )
 
+# plots
+par( mfrow = c(1,3) )
+plot( CD_l$z )
+abline(h = -1.96)
+abline(h = 1.96)
+plot( IF_l )
+abline(h = 1)
+plot( mc_error_l )
+par( mfrow = c(1,1) )
