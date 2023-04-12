@@ -32,9 +32,9 @@ chain_v          = exp( chain_e[1, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 0
+burn = 1e3
 # Jumps
-lags = 1
+lags = 10
 jumps = seq(1, N - burn, by = lags)
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
@@ -55,17 +55,20 @@ N_new = length( jumps )
 ###############################################################################
 ###############################################################################
 ############################### theta
-par(mfrow = c(2, 3))
-plot(chain_theta[1, ], type = 'l', main = 'mu', ylab = '')
-plot(acf(chain_theta[1, ], lag.max = 100, plot = FALSE)[1:100])
-hist(chain_theta[1, ], breaks = 40)
-plot(chain_theta[2, ], type = 'l', main = 'phi', ylab = '')
-plot(acf(chain_theta[2, ], lag.max = 100, plot = FALSE)[1:100])
-hist(chain_theta[2, ], breaks = 40)
-plot(chain_theta[3, ], type = 'l', main = 'sigma', ylab = '')
-plot(acf(chain_theta[3, ], lag.max = 100, plot = FALSE)[1:100])
-hist(chain_theta[3, ], breaks = 40)
-par(mfrow = c(1, 1))
+par( mfrow = c(2, 3) )
+plot(chain_theta[1, ], type = 'l', main = '', xlab = '', ylab = 'mu')
+plot(acf(chain_theta[1, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_theta[1, ],  main = '', xlab = '', ylab = '', breaks = 40)
+plot(chain_theta[2, ], type = 'l', main = '', xlab = '', ylab = 'phi')
+plot(acf(chain_theta[2, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_theta[2, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(chain_theta[3, ], type = 'l',  main = '', xlab = '', ylab = 'sigma')
+plot(acf(chain_theta[3, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_theta[3, ], main = '', xlab = '', ylab = '', breaks = 40)
+par( mfrow = c(1, 1) )
 ############### Análise numérica
 mcmcchain_theta = coda::as.mcmc( t( chain_theta ) )
 ####### Geweke Statistic
@@ -99,15 +102,18 @@ colnames( data_theta ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 ###############################################################################
 ############################### b
 par( mfrow = c(2, 3) )
-plot(chain_b[1, ], type = 'l', main = 'b0', ylab = '')
-plot(acf(chain_b[1, ], lag.max = 100, plot = FALSE)[1:100])
-hist(chain_b[1, ], breaks = 40)
-plot(chain_b[2, ], type = 'l', main = 'b1', ylab = '')
-plot(acf(chain_b[2, ], lag.max = 100, plot = FALSE)[1:100])
-hist(chain_b[1, ], breaks = 40)
-plot(chain_b[3, ], type = 'l', main = 'b2', ylab = '')
-plot(acf(chain_b[3, ], lag.max = 100, plot = FALSE)[1:100])
-hist(chain_b[1, ], breaks = 40)
+plot(chain_b[1, ], type = 'l', main = '', xlab = '', ylab = 'b0')
+plot(acf(chain_b[1, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(chain_b[2, ], type = 'l', main = '', xlab = '', ylab = 'b1')
+plot(acf(chain_b[2, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(chain_b[3, ], type = 'l', main = '', xlab = '', ylab = 'b2')
+plot(acf(chain_b[3, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
 par( mfrow = c(1, 1) )
 
 ############### Análise numérica
@@ -142,12 +148,13 @@ colnames( data_b ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 ###############################################################################
 ###############################################################################
 ############################### e = log( v )
-par(mfrow = c(1, 3))
-plot(chain_e, type = 'l', main = 'e = log( v )')
+par( mfrow = c(1, 3) )
+plot(chain_e, type = 'l', main = '', xlab = '', ylab = 'e = log( v )')
 abline( h = log( v ) )
-plot(acf(chain_e, lag.max = 100, plot = FALSE)[1:100])
-hist(chain_e, breaks = 40)
-par(mfrow = c(1, 1))
+plot(acf(chain_e, lag.max = 100, plot = FALSE)[1:100], main = '', 
+     xlab = '', ylab = '')
+hist(chain_e, main = '', xlab = '', ylab = '', breaks = 40)
+par( mfrow = c(1, 1) )
 
 ############### Análise numérica
 mcmcchain_e = coda::as.mcmc( chain_e ) 
@@ -177,11 +184,12 @@ row.names( data_e ) = c('e')
 colnames( data_e ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 ###############################################################################
 ###############################################################################
+# Resume Table
 data = data_theta
 data = rbind( data, data_b, data_e )
 data = cbind( c(mu, phi, sigma, b0, b1, b2, log(v) ), data )
 colnames( data ) = c('vdd', 'média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
-data = round( data, 5 )
+data = round( data, 4 )
 data
 ###############################################################################
 ###############################################################################
