@@ -1,17 +1,16 @@
 
 library( ggplot2 )
-Rcpp::sourceCpp('ts_model.cpp')
+Rcpp::sourceCpp( 'ts_model.cpp' )
 
 # Sampling
 N = 5e3
 samples = svm_smn_ts(N,
-                     L_theta = 100, eps_theta = 0.5, 
+                     L_theta = 20, eps_theta = c( 0.5, 0.5, 1.0 ), 
                      L_b = 20, eps_b = 0.1, 
                      L_h = 50, eps_h = 0.015,
                      L_v = 80, eps_v = 0.025, 
                      y_T = c(y0, y), 
                      seed = 0 )
-
 samples$acc / N
 samples$time / 60
 
@@ -86,10 +85,12 @@ mc_error_theta = apply( chain_theta,
                         FUN = sd) / sqrt( N_eff_theta )
                        
 theta_hat = apply( chain_theta, MARGIN = 1, FUN = mean )
+theta_sd = apply( chain_theta, MARGIN = 1, FUN = sd )
 theta_min = apply( chain_theta, MARGIN = 1, FUN = quantile, probs = c(0.025) )
 theta_max = apply( chain_theta, MARGIN = 1, FUN = quantile, probs = c(0.975) )
 data_theta = matrix(
                     c(theta_hat,
+                      theta_sd,
                       theta_min,
                       theta_max,
                       CD_theta$z,
@@ -97,7 +98,6 @@ data_theta = matrix(
                       mc_error_theta), nrow = 3, byrow = FALSE
                     )
 row.names( data_theta ) = c('mu', 'phi', 'sigma')
-colnames( data_theta ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 ###############################################################################
 ###############################################################################
 ############################### b
@@ -109,11 +109,11 @@ hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
 plot(chain_b[2, ], type = 'l', main = '', xlab = '', ylab = 'b1')
 plot(acf(chain_b[2, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
+hist(chain_b[2, ], main = '', xlab = '', ylab = '', breaks = 40)
 plot(chain_b[3, ], type = 'l', main = '', xlab = '', ylab = 'b2')
 plot(acf(chain_b[3, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
+hist(chain_b[3, ], main = '', xlab = '', ylab = '', breaks = 40)
 par( mfrow = c(1, 1) )
 
 ############### Análise numérica
@@ -133,18 +133,19 @@ mc_error_b = apply( chain_b,
                     FUN = sd) / sqrt( N_eff_b )
 
 b_hat = apply( chain_b, MARGIN = 1, FUN = mean )
+b_sd = apply( chain_b, MARGIN = 1, FUN = sd )
 b_min = apply( chain_b, MARGIN = 1, FUN = quantile, probs = c(0.025) )
 b_max = apply( chain_b, MARGIN = 1, FUN = quantile, probs = c(0.975) )
 data_b = matrix(
                 c(b_hat,
-                b_min,
-                b_max,
-                CD_b$z,
-                IF_b,
-                mc_error_b), nrow = 3, byrow = FALSE
+                  b_sd,
+                  b_min,
+                  b_max,
+                  CD_b$z,
+                  IF_b,
+                  mc_error_b), nrow = 3, byrow = FALSE
                )
 row.names( data_b ) = c('b0', 'b1', 'b2')
-colnames( data_b ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 ###############################################################################
 ###############################################################################
 ############################### e = log( v )
@@ -170,10 +171,12 @@ IF_e = N_new / N_eff_e
 # MCerror = sd( Variavel ) / sqrt( N_eff )
 mc_error_e = sd( chain_e ) / sqrt( N_eff_e )
 e_hat = mean( chain_e )
+e_sd = sd( chain_e )
 e_min = quantile( chain_e, probs = c(0.025) )
 e_max = quantile( chain_e, probs = c(0.975) )
 data_e = matrix(
                 c(e_hat,
+                  e_sd, 
                 e_min,
                 e_max,
                 CD_e$z,
@@ -181,14 +184,13 @@ data_e = matrix(
                 mc_error_e), nrow = 1, byrow = FALSE
                )
 row.names( data_e ) = c('e')
-colnames( data_e ) = c('média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 ###############################################################################
 ###############################################################################
 # Resume Table
 data = data_theta
 data = rbind( data, data_b, data_e )
 data = cbind( c(mu, phi, sigma, b0, b1, b2, log(v) ), data )
-colnames( data ) = c('vdd', 'média', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
+colnames( data ) = c('vdd', 'média', 'sd', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 data = round( data, 4 )
 data
 ###############################################################################
