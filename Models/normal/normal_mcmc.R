@@ -1,8 +1,7 @@
 ################################################################################
 #### librarys
 library(ggplot2)
-
-Rcpp::sourceCpp('run_svmn_rcpp_bruno.cpp')
+Rcpp::sourceCpp('normal_model.cpp')
 
 N = 1e4
 samples = svmn(N,
@@ -11,7 +10,7 @@ samples = svmn(N,
                L_h = 50, eps_h = 0.015,
                y_T = c(y0, y),
                seed = 0
-               )
+)
 
 samples$time / 60
 samples$acc / N
@@ -28,26 +27,23 @@ b_chain[2, ]     = tanh( b_chain[2, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 1e3
+burn = 0
 # Jumps
-lags = 10
+lags = 1
 jumps = seq(1, N - burn, by = lags)
 
+chain_theta  = chain_theta[, - c( 1:burn ) ] 
+chain_b     = chain_b[, - c( 1:burn ) ]
+chain_h     = chain_h[, - c( 1:burn ) ]
+
+chain_theta = chain_theta[, jumps ]
+chain_b     = chain_b[, jumps ]
+chain_h     = chain_h[, jumps ]
+
+N_new = length( jumps )
 ###############################################################################
 ###############################################################################
 ############################### theta
-theta_burned = as.matrix( theta_chain[, -c( 1:burn )] )
-theta_burned_lag = theta_burned[, jumps]
-
-#par(mfrow = c(2, 2))
-#plot(theta_burned[1, ], type = 'l', main = 'mu')
-#plot(acf(theta_burned[1, ], lag.max = 100, plot = FALSE)[1:100])
-#plot(theta_burned[2, ], type = 'l', main = 'phi')
-#plot(acf(theta_burned[2, ], lag.max = 100, plot = FALSE)[1:100])
-#plot(theta_burned[3, ], type = 'l', main = 'sigma')
-#plot(acf(theta_burned[3, ], lag.max = 100, plot = FALSE)[1:100])
-#par(mfrow = c(1, 1))
-
 par(mfrow = c(2, 2))
 plot(theta_burned_lag[1, ], type = 'l', main = 'mu')
 plot(acf(theta_burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
@@ -77,14 +73,23 @@ mc_error_theta = round( apply( theta_burned_lag,
                                MARGIN = 1, 
                                FUN = sd) / sqrt( N_eff_theta ), 
                         5 )
-mc_error_theta
-
+theta_hat = apply( chain_theta, MARGIN = 1, FUN = mean )
+theta_sd = apply( chain_theta, MARGIN = 1, FUN = sd )
+theta_min = apply( chain_theta, MARGIN = 1, FUN = quantile, probs = c(0.025) )
+theta_max = apply( chain_theta, MARGIN = 1, FUN = quantile, probs = c(0.975) )
+data_theta = matrix(
+  c(theta_hat,
+    theta_sd,
+    theta_min,
+    theta_max,
+    CD_theta$z,
+    IF_theta,
+    mc_error_theta), nrow = 3, byrow = FALSE
+)
+row.names( data_theta ) = c('mu', 'phi', 'sigma')
 ###############################################################################
 ###############################################################################
 ############################### b
-b_burned = as.matrix( b_chain[, -c( 1:burn )] )
-b_burned_lag = b_burned[, jumps]
-
 par(mfrow = c(2, 2))
 plot(b_burned_lag[1, ], type = 'l', main = 'b0')
 plot(acf(b_burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
@@ -112,35 +117,45 @@ mc_error_b = round( apply( b_burned_lag,
                            MARGIN = 1, 
                            FUN = sd) / sqrt( N_eff_b ), 
                     5 )
-mc_error_b
-
+b_hat = apply( chain_b, MARGIN = 1, FUN = mean )
+b_sd = apply( chain_b, MARGIN = 1, FUN = sd )
+b_min = apply( chain_b, MARGIN = 1, FUN = quantile, probs = c(0.025) )
+b_max = apply( chain_b, MARGIN = 1, FUN = quantile, probs = c(0.975) )
+data_b = matrix(
+  c(b_hat,
+    b_sd,
+    b_min,
+    b_max,
+    CD_b$z,
+    IF_b,
+    mc_error_b), nrow = 3, byrow = FALSE
+)
+row.names( data_b ) = c('b0', 'b1', 'b2')
 ###############################################################################
 ###############################################################################
 ############################### h
-h_burned = as.matrix( h_chain[, -c( 1:burn )] )
-h_burned_lag = h_burned[, jumps]
-
-H = h_burned_lag
-h_hat = apply(H, MARGIN = 1, FUN = mean)
-h_min = apply(H, MARGIN = 1, FUN = quantile, probs = c(0.025) )
-h_max = apply(H, MARGIN = 1, FUN = quantile, probs = c(0.975) )
+h_hat = apply(chain_h, MARGIN = 1, FUN = mean)
+h_min = apply(chain_h, MARGIN = 1, FUN = quantile, probs = c(0.025) )
+h_max = apply(chain_h, MARGIN = 1, FUN = quantile, probs = c(0.975) )
 data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
 data = data.frame(data)
 names(data) = c('obs', 'vdd', 'media', 'min','max')
-g = ggplot(data[1:250, ]) 
+#plots
+a = sample(1:(T - 251), 1)
+g = ggplot(data[ a:(250 + a), ]) 
 g = g + geom_line(aes(obs, media))
 g = g + geom_line(aes(obs, vdd), color = 'red')
 g = g + geom_line(aes(obs, min), linetype = 'dashed')
 g = g + geom_line(aes(obs, max), linetype = 'dashed')
 g
-
-############### Análise numérica
-mcmcchain_h = coda::as.mcmc( t( H ) ) 
+############### Numeric Analysis
+mcmcchain_h = coda::as.mcmc( t( chain_h ) ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_h = coda::geweke.diag( mcmcchain_h )
-# Espera-se que 95% desdes valores estejam no intervalo ( -1.96 , 1.96 )
-geweke = sum( abs( CD_h$z ) < 1.96 ) / T
+# Fração de valores que est]ao no intervalo ( -1.96 , 1.96 )
+geweke_h = sum( abs( CD_h$z ) < 1.96 ) / T
+geweke_h
 ####### Fator de ineficiência (IF)
 # IF = N / N_eff, onde N_eff = effective Sample Size
 # Se IF >> 1, indica uma má mistura da cadeia gerada
@@ -148,21 +163,20 @@ N_eff_h = coda::effectiveSize( mcmcchain_h )
 IF_h = N_new / N_eff_h
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_h = round( apply( H, 
+mc_error_h = round( apply( chain_h, 
                            MARGIN = 1, 
                            FUN = sd) / sqrt( N_eff_h ), 
                     5 )
 
 # plots
 par( mfrow = c(1,3) )
-plot( CD_h$z, main = 'Geweke diagnostic' )
+plot( CD_h$z, main = 'Geweke diagnostic', xlab = '', ylab = '' )
 abline(h = -1.96)
 abline(h = 1.96)
-plot( IF_h, main = 'Inefficiency factors' )
+plot( IF_h, main = 'Inefficiency factors', xlab = '', ylab = '' )
 abline(h = 1)
-plot( mc_error_h, main = 'MCMC errors' )
+plot( mc_error_h, main = 'MCMC errors', xlab = '', ylab = '' )
 par( mfrow = c(1,1) )
-
 ###############################################################################
 ###############################################################################
 ############################## Model Selection
@@ -174,24 +188,25 @@ par( mfrow = c(1,1) )
 # theta_hat = ( b_hat, h_hat )
 # theta_draws = burned_lag
 
-log_lik = function(theta_hat, data){
+log_lik = function(theta_t, data){
+  # função checada (13/04/23)
+  T = length( data ) - 1
   
-  b0 = theta_hat[1]
-  b1 = theta_hat[2]
-  b2 = theta_hat[3]
-  
-  h_hat = theta_hat[4:(T+3)]
+  b0_t = theta_t[1]
+  b1_t = theta_t[2]
+  b2_t = theta_t[3]
+  h_t = theta_t[4:(T+3)]
   
   log_l = dnorm(data[2:( T + 1 )], 
-                mean = b0 + b1 * data[1:T] + b2 * exp( h_hat ), 
-                sd = exp( h_hat/2 ), 
-                log = TRUE )
+                mean = b0 + b1 * data[1:T] + b2 * exp( h_t ), 
+                sd = exp( 0.5 * h_t ), 
+                log = TRUE)
   
   return( sum( log_l ) )
   
 }
 log_lik_i = function(data, theta_draws){
-  
+  # função checada (13/04/23)
   x = apply(X = theta_draws, MARGIN = 2, FUN = log_lik, data)
   
   return( x )
@@ -204,16 +219,15 @@ dic = function(data, theta_draws, theta_hat){
   return( DIC )
 } 
 
-b_hat = c(mean( b_burned_lag[1, ] ),
-          mean( b_burned_lag[2, ] ),
-          mean( b_burned_lag[3, ] )
-)
+# construindo theta_hat e theta_draws
+theta_hat = c( b_hat, h_hat, l_hat )
+theta_draws = chain_b
+theta_draws = rbind( theta_draws, chain_h )
 
-theta_hat = c( b_hat, h_hat )
-
-dic( data = c(y0,y), 
-     theta_draws = theta_burned_lag, 
-     theta_hat )
+# calculando DIC
+svmn = dic( data = c(y0, y), 
+            theta_draws = theta_draws, 
+            theta_hat )
 
 ############### loo
 
