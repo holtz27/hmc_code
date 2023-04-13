@@ -15,22 +15,23 @@ samples = svmn(N,
 samples$time / 60
 samples$acc / N
 
-theta_chain = samples$chain$chain_theta
-b_chain     = samples$chain$chain_b
-h_chain     = samples$chain$chain_h
+chain_theta = samples$chain$chain_theta
+chain_b     = samples$chain$chain_b
+chain_h     = samples$chain$chain_h
 
 # Transformations
-theta_chain[2, ] = tanh( theta_chain[2, ] )
-theta_chain[3, ] = exp( theta_chain[3, ] )
-b_chain[2, ]     = tanh( b_chain[2, ] )
+chain_theta[2, ] = tanh( chain_theta[2, ] )
+chain_b[3, ] = exp( chain_b[3, ] )
+chain_h[2, ]     = tanh( chain_h[2, ] )
 
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 0
+burn = 2e3
 # Jumps
-lags = 1
+lags = 10
 jumps = seq(1, N - burn, by = lags)
+length( jumps )
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
 chain_b     = chain_b[, - c( 1:burn ) ]
@@ -45,31 +46,27 @@ N_new = length( jumps )
 ###############################################################################
 ############################### theta
 par(mfrow = c(2, 2))
-plot(theta_burned_lag[1, ], type = 'l', main = 'mu')
-plot(acf(theta_burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
-plot(theta_burned_lag[2, ], type = 'l', main = 'phi')
-plot(acf(theta_burned_lag[2, ], lag.max = 100, plot = FALSE)[1:100])
-plot(theta_burned_lag[3, ], type = 'l', main = 'sigma')
-plot(acf(theta_burned_lag[3, ], lag.max = 100, plot = FALSE)[1:100])
+plot(chain_theta[1, ], type = 'l', main = 'mu')
+plot(acf(chain_theta[1, ], lag.max = 100, plot = FALSE)[1:100])
+plot(chain_theta[2, ], type = 'l', main = 'phi')
+plot(acf(chain_theta[2, ], lag.max = 100, plot = FALSE)[1:100])
+plot(chain_theta[3, ], type = 'l', main = 'sigma')
+plot(acf(chain_theta[3, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
 
-N_new = length( theta_burned_lag[1, ] )
-
 ############### Análise numérica
-mcmcchain_theta = coda::as.mcmc( t( theta_burned_lag ) )
+mcmcchain_theta = coda::as.mcmc( t( chain_theta ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_theta = coda::geweke.diag( mcmcchain_theta )
-CD_theta
 ####### Fator de ineficiência (IF)
 # IF = N / N_eff, onde N_eff = effective Sample Size
 # Se IF >> 1, indica uma má mistura da cadeia gerada
 N_eff_theta = coda::effectiveSize( mcmcchain_theta )
 IF_theta = N_new / N_eff_theta
-IF_theta
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_theta = round( apply( theta_burned_lag, 
+mc_error_theta = round( apply( chain_theta, 
                                MARGIN = 1, 
                                FUN = sd) / sqrt( N_eff_theta ), 
                         5 )
@@ -91,29 +88,27 @@ row.names( data_theta ) = c('mu', 'phi', 'sigma')
 ###############################################################################
 ############################### b
 par(mfrow = c(2, 2))
-plot(b_burned_lag[1, ], type = 'l', main = 'b0')
-plot(acf(b_burned_lag[1, ], lag.max = 100, plot = FALSE)[1:100])
-plot(b_burned_lag[2, ], type = 'l', main = 'b1')
-plot(acf(b_burned_lag[2, ], lag.max = 100, plot = FALSE)[1:100])
-plot(b_burned_lag[3, ], type = 'l', main = 'b2')
-plot(acf(b_burned_lag[3, ], lag.max = 100, plot = FALSE)[1:100])
+plot(chain_b[1, ], type = 'l', main = 'b0')
+plot(acf(chain_b[1, ], lag.max = 100, plot = FALSE)[1:100])
+plot(chain_b[2, ], type = 'l', main = 'b1')
+plot(acf(chain_b[2, ], lag.max = 100, plot = FALSE)[1:100])
+plot(chain_b[3, ], type = 'l', main = 'b2')
+plot(acf(chain_b[3, ], lag.max = 100, plot = FALSE)[1:100])
 par(mfrow = c(1, 1))
 
 ############### Análise numérica
-mcmcchain_b = coda::as.mcmc( t( b_burned_lag ) )
+mcmcchain_b = coda::as.mcmc( t( chain_b ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
 CD_b = coda::geweke.diag( mcmcchain_b )
-CD_b
 ####### Fator de ineficiência (IF)
 # IF = N / N_eff, onde N_eff = effective Sample Size
 # Se IF >> 1, indica uma má mistura da cadeia gerada
 N_eff_b = coda::effectiveSize( mcmcchain_b )
 IF_b = N_new / N_eff_b
-IF_b
 ####### MCMC error
 # MCerror = sd( Variavel ) / sqrt( N_eff )
-mc_error_b = round( apply( b_burned_lag, 
+mc_error_b = round( apply( chain_b, 
                            MARGIN = 1, 
                            FUN = sd) / sqrt( N_eff_b ), 
                     5 )
@@ -133,18 +128,30 @@ data_b = matrix(
 row.names( data_b ) = c('b0', 'b1', 'b2')
 ###############################################################################
 ###############################################################################
+# Summary Table
+data = data_theta
+data = rbind( data, data_b)
+#data = cbind( c(mu, phi, sigma, b0, b1, b2, log(v) ), data )
+#colnames( data ) = c('vdd', 'média', 'sd', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
+colnames( data ) = c('média', 'sd', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
+data = round( data, 4 )
+data
+###############################################################################
+###############################################################################
 ############################### h
 h_hat = apply(chain_h, MARGIN = 1, FUN = mean)
 h_min = apply(chain_h, MARGIN = 1, FUN = quantile, probs = c(0.025) )
 h_max = apply(chain_h, MARGIN = 1, FUN = quantile, probs = c(0.975) )
-data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
+#data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
+data = matrix(c(1:T, h_hat, h_min, h_max), ncol = 4)
 data = data.frame(data)
-names(data) = c('obs', 'vdd', 'media', 'min','max')
+#names(data) = c('obs', 'vdd', 'media', 'min','max')
+names(data) = c('obs', 'media', 'min','max')
 #plots
-a = sample(1:(T - 251), 1)
+a = sample(1:(T - 151), 1)
 g = ggplot(data[ a:(250 + a), ]) 
 g = g + geom_line(aes(obs, media))
-g = g + geom_line(aes(obs, vdd), color = 'red')
+#g = g + geom_line(aes(obs, vdd), color = 'red')
 g = g + geom_line(aes(obs, min), linetype = 'dashed')
 g = g + geom_line(aes(obs, max), linetype = 'dashed')
 g
@@ -167,7 +174,6 @@ mc_error_h = round( apply( chain_h,
                            MARGIN = 1, 
                            FUN = sd) / sqrt( N_eff_h ), 
                     5 )
-
 # plots
 par( mfrow = c(1,3) )
 plot( CD_h$z, main = 'Geweke diagnostic', xlab = '', ylab = '' )
