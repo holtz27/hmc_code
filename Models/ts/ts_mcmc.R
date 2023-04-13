@@ -1,11 +1,12 @@
-
+################################################################################
+#### librarys
 library( ggplot2 )
 Rcpp::sourceCpp( 'ts_model.cpp' )
 
 # Sampling
-N = 5e3
+N = 10
 samples = svm_smn_ts(N,
-                     L_theta = 20, eps_theta = c( 0.5, 0.5, 1.0 ), 
+                     L_theta = 10, eps_theta = c( 0.5, 0.5, 0.015 ), 
                      L_b = 20, eps_b = 0.1, 
                      L_h = 50, eps_h = 0.015,
                      L_v = 80, eps_v = 0.025, 
@@ -14,9 +15,9 @@ samples = svm_smn_ts(N,
 samples$acc / N
 samples$time / 60
 
-# Saving
+################## Save outputs
 #save(samples, file = 'ts_samples.RDara')
-#load('ts_samples.RDara')
+load('ts_samples.RDara')
 
 chain_theta = samples$chain$chain_theta
 chain_b = samples$chain$chain_b
@@ -31,9 +32,9 @@ chain_v          = exp( chain_e[1, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 1e3
+burn = 0
 # Jumps
-lags = 10
+lags = 1
 jumps = seq(1, N - burn, by = lags)
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
@@ -56,19 +57,20 @@ N_new = length( jumps )
 ############################### theta
 par( mfrow = c(2, 3) )
 plot(chain_theta[1, ], type = 'l', main = '', xlab = '', ylab = 'mu')
-plot(acf(chain_theta[1, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+plot(acf(chain_theta[1, ], lag.max = 200, plot = FALSE)[1:200], main = '', 
      xlab = '', ylab = '')
 hist(chain_theta[1, ],  main = '', xlab = '', ylab = '', breaks = 40)
 plot(chain_theta[2, ], type = 'l', main = '', xlab = '', ylab = 'phi')
-plot(acf(chain_theta[2, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+plot(acf(chain_theta[2, ], lag.max = 200, plot = FALSE)[1:200], main = '', 
      xlab = '', ylab = '')
 hist(chain_theta[2, ], main = '', xlab = '', ylab = '', breaks = 40)
 plot(chain_theta[3, ], type = 'l',  main = '', xlab = '', ylab = 'sigma')
-plot(acf(chain_theta[3, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
+plot(acf(chain_theta[3, ], lag.max = 200, plot = FALSE)[1:200], main = '', 
      xlab = '', ylab = '')
 hist(chain_theta[3, ], main = '', xlab = '', ylab = '', breaks = 40)
 par( mfrow = c(1, 1) )
-############### Análise numérica
+
+############### Numeric Analysis
 mcmcchain_theta = coda::as.mcmc( t( chain_theta ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
@@ -116,7 +118,7 @@ plot(acf(chain_b[3, ], lag.max = 100, plot = FALSE)[1:100], main = '',
 hist(chain_b[3, ], main = '', xlab = '', ylab = '', breaks = 40)
 par( mfrow = c(1, 1) )
 
-############### Análise numérica
+############### Numeric Analysis
 mcmcchain_b = coda::as.mcmc( t( chain_b ) )
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
@@ -157,7 +159,7 @@ plot(acf(chain_e, lag.max = 100, plot = FALSE)[1:100], main = '',
 hist(chain_e, main = '', xlab = '', ylab = '', breaks = 40)
 par( mfrow = c(1, 1) )
 
-############### Análise numérica
+############### Numeric Analysis
 mcmcchain_e = coda::as.mcmc( chain_e ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
@@ -186,7 +188,7 @@ data_e = matrix(
 row.names( data_e ) = c('e')
 ###############################################################################
 ###############################################################################
-# Resume Table
+# Summary Table
 data = data_theta
 data = rbind( data, data_b, data_e )
 data = cbind( c(mu, phi, sigma, b0, b1, b2, log(v) ), data )
@@ -210,7 +212,7 @@ f = f + geom_line(aes(obs, vdd), color = 'red')
 f = f + geom_line(aes(obs, min), linetype = 'dashed')
 f = f + geom_line(aes(obs, max), linetype = 'dashed')
 f
-############### Análise numérica
+############### Numeric Analysis
 mcmcchain_l = coda::as.mcmc( t( chain_l ) ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
@@ -254,7 +256,7 @@ g = g + geom_line(aes(obs, vdd), color = 'red')
 g = g + geom_line(aes(obs, min), linetype = 'dashed')
 g = g + geom_line(aes(obs, max), linetype = 'dashed')
 g
-############### Análise numérica
+############### Numeric Analysis
 mcmcchain_h = coda::as.mcmc( t( chain_h ) ) 
 ####### Geweke Statistic
 # |G| > 1.96 evidencia não convergencia
@@ -283,3 +285,54 @@ plot( IF_h, main = 'Inefficiency factors', xlab = '', ylab = '' )
 abline(h = 1)
 plot( mc_error_h, main = 'MCMC errors', xlab = '', ylab = '' )
 par( mfrow = c(1,1) )
+###############################################################################
+###############################################################################
+############################## Model Selection
+
+############### dic deviance information criterion:
+# p( y | theta ) = p( y | b, theta_h, v, h, l) = p( y | b, h, l )
+# theta = b, h, l
+# data = c( y0, y )
+# theta_hat = ( b_hat, h_hat, l_hat )
+# theta_draws = burned_lag
+
+log_lik = function(theta_t, data){
+  # função checada (13/04/23)
+  T = length( data ) - 1
+  
+  b0_t = theta_t[1]
+  b1_t = theta_t[2]
+  b2_t = theta_t[3]
+  h_t = theta_t[4:(T+3)]
+  l_t = theta_t[(T + 4):(2 * T + 3)]
+  log_l = dnorm(data[2:( T + 1 )], 
+                mean = b0 + b1 * data[1:T] + b2 * exp( h_t ), 
+                sd = exp( 0.5 * h_t ) / sqrt( l_t ), 
+                log = TRUE)
+  
+  return( sum( log_l ) )
+  
+}
+log_lik_i = function(data, theta_draws){
+  # função checada (13/04/23)
+  x = apply(X = theta_draws, MARGIN = 2, FUN = log_lik, data)
+  
+  return( x )
+}
+dic = function(data, theta_draws, theta_hat){
+  
+  pD = 2 * ( log_lik( theta_hat, data ) - mean( log_lik_i(data, theta_draws) ) )      
+  DIC = - 2 * log_lik( theta_hat, data ) + 2 * pD  
+  
+  return( DIC )
+} 
+
+# construindo theta_hat e theta_draws
+theta_hat = c( b_hat, h_hat, l_hat )
+theta_draws = chain_b
+theta_draws = rbind( theta_draws, chain_h )
+theta_draws = rbind( theta_draws, chain_l )
+# calculando DIC
+dic( data = c(y0, y), 
+     theta_draws = theta_draws, 
+     theta_hat )
