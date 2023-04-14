@@ -3,7 +3,7 @@
 library(ggplot2)
 Rcpp::sourceCpp('normal_model.cpp')
 
-N = 1e4
+N = 5e3
 samples = svmn(N,
                L_theta = 20, eps_theta = 0.5,
                L_b = 20, eps_b = 0.1,
@@ -27,11 +27,10 @@ chain_h[2, ]     = tanh( chain_h[2, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 2e3
+burn = 0
 # Jumps
-lags = 10
+lags = 1
 jumps = seq(1, N - burn, by = lags)
-length( jumps )
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
 chain_b     = chain_b[, - c( 1:burn ) ]
@@ -186,14 +185,17 @@ par( mfrow = c(1,1) )
 ###############################################################################
 ###############################################################################
 ############################## Model Selection
-
+# construindo theta_hat e theta_draws
+theta_hat = c( b_hat, h_hat )
+theta_draws = chain_b
+theta_draws = rbind( theta_draws, chain_h )
+theta_draws = as.matrix( theta_draws )
 ############### dic deviance information criterion:
 # p( y | theta ) = p( y | b, theta_h, v, h ) = p( y | b, h )
 # theta = b, h
 # data = c( y0, y )
 # theta_hat = ( b_hat, h_hat )
 # theta_draws = burned_lag
-
 log_lik = function(theta_t, data){
   # função checada (13/04/23)
   T = length( data ) - 1
@@ -225,51 +227,49 @@ dic = function(data, theta_draws, theta_hat){
   return( DIC )
 } 
 
-# construindo theta_hat e theta_draws
-theta_hat = c( b_hat, h_hat, l_hat )
-theta_draws = chain_b
-theta_draws = rbind( theta_draws, chain_h )
-
 # calculando DIC
 svmn = dic( data = c(y0, y), 
             theta_draws = theta_draws, 
             theta_hat )
 
 ############### loo
-
 lik = function(data_i, draws, data_, data_past){
-  
-  b0_draws = draws[1, ]
-  b1_draws = draws[2, ]
-  b2_draws = draws[3, ]
-  h_draws = draws[4:(T + 4), ]
-  
+  #data_ = ( y_{1}, y_{2}, ..., y_{T} )
+  #data_past = ( y_{0}, y_{1}, ..., y_{T-1} )
   k = which( data_ == as.numeric( data_i ) )
+  log_l = NULL
+  N = ncol( draws )
   
-  log_l = dnorm(data_i, 
-                mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws[k, ] ), 
-                sd = exp( h_draws[k, ]/2 ), 
-                log = FALSE )
+  for(col in 1:N){
+    
+    b0_draws = draws[1, col]
+    b1_draws = draws[2, col]
+    b2_draws = draws[3, col]
+    h_draws  = draws[3 + k, col]
+    
+    log_l[col] = dnorm(data_i, mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws ), 
+                       sd = exp( 0.5 * h_draws ) )
+                       
+  }
   
   return( log_l )
 }
 
 r_eff = loo::relative_eff(lik,
-                          chain_id = rep(1, ncol( burned_lag ) ),
-                          data = matrix( c( y ), ncol = 1 ), 
-                          draws =  burned_lag,
+                          chain_id = rep(1, ncol( theta_draws ) ),
+                          data = as.matrix( y ), 
+                          draws = theta_draws,
                           data_ = y,
                           data_past = c( y0, y[1:(T-1)] ),
                           cores = getOption('mc.cores', 3)
 )
 
-
 # or set r_eff = NA
 loo::loo(lik, 
-         #r_eff = NA,
-         r_eff = r_eff, 
+         r_eff = NA,
+         #r_eff = r_eff, 
          data = as.matrix( y ), 
-         draws =  burned_lag,
+         draws = theta_draws,
          data_ = y,
          data_past = c( y0, y[1:(T-1)] ),
          cores = getOption('mc.cores', 3)
@@ -277,25 +277,30 @@ loo::loo(lik,
 
 ############### waic
 log_lik = function(data_i, draws, data_, data_past){
-  
-  b0_draws = draws[1, ]
-  b1_draws = draws[2, ]
-  b2_draws = draws[3, ]
-  h_draws = draws[4:(T + 4), ]
-  
+  #data_ = ( y_{1}, y_{2}, ..., y_{T} )
+  #data_past = ( y_{0}, y_{1}, ..., y_{T-1} )
   k = which( data_ == as.numeric( data_i ) )
+  log_l = NULL
+  N = ncol( draws )
   
-  log_l = dnorm(data_i, 
-                mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws[k, ] ), 
-                sd = exp( h_draws[k, ]/2 ), 
-                log = TRUE )
+  for(col in 1:N){
+    
+    b0_draws = draws[1, col]
+    b1_draws = draws[2, col]
+    b2_draws = draws[3, col]
+    h_draws  = draws[3 + k, col]
+    
+    log_l[col] = dnorm(data_i, mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws ), 
+                       sd = exp( 0.5 * h_draws ), log = TRUE )
+    
+  }
   
   return( log_l )
 }
 
 loo::waic(log_lik, 
           data = matrix( y, ncol = 1 ), 
-          draws =  burned_lag,
+          draws = theta_draws,
           data_ = y,
           data_past = c( y0, y[1:(T-1)] )
 )
