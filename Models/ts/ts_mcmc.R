@@ -4,12 +4,12 @@ library( ggplot2 )
 Rcpp::sourceCpp( 'ts_model.cpp' )
 
 # Sampling
-N = 10
+N = 5e4
 samples = svm_smn_ts(N,
-                     L_theta = 10, eps_theta = c( 0.5, 0.5, 0.015 ), 
+                     L_theta = 20, eps_theta = c( 0.5, 0.5, 0.5 ), 
                      L_b = 20, eps_b = 0.1, 
                      L_h = 50, eps_h = 0.015,
-                     L_v = 80, eps_v = 0.025, 
+                     L_v = 20, eps_v = 0.025, 
                      y_T = c(y0, y), 
                      seed = 0 )
 samples$acc / N
@@ -17,7 +17,7 @@ samples$time / 60
 
 ################## Save outputs
 #save(samples, file = 'ts_samples.RDara')
-load('ts_samples.RDara')
+#load('ts_samples.RDara')
 
 chain_theta = samples$chain$chain_theta
 chain_b = samples$chain$chain_b
@@ -32,9 +32,9 @@ chain_v          = exp( chain_e[1, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 0
+burn = 2e3
 # Jumps
-lags = 1
+lags = 10
 jumps = seq(1, N - burn, by = lags)
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
@@ -153,7 +153,7 @@ row.names( data_b ) = c('b0', 'b1', 'b2')
 ############################### e = log( v )
 par( mfrow = c(1, 3) )
 plot(chain_e, type = 'l', main = '', xlab = '', ylab = 'e = log( v )')
-abline( h = log( v ) )
+#abline( h = log( v ) )
 plot(acf(chain_e, lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
 hist(chain_e, main = '', xlab = '', ylab = '', breaks = 40)
@@ -191,8 +191,9 @@ row.names( data_e ) = c('e')
 # Summary Table
 data = data_theta
 data = rbind( data, data_b, data_e )
-data = cbind( c(mu, phi, sigma, b0, b1, b2, log(v) ), data )
-colnames( data ) = c('vdd', 'média', 'sd', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
+#data = cbind( c(mu, phi, sigma, b0, b1, b2, log(v) ), data )
+#colnames( data ) = c('vdd', 'média', 'sd', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
+colnames( data ) = c('média', 'sd', '2.5%', '97.5%', 'CD', 'IF', 'mc_error')
 data = round( data, 4 )
 data
 ###############################################################################
@@ -288,14 +289,17 @@ par( mfrow = c(1,1) )
 ###############################################################################
 ###############################################################################
 ############################## Model Selection
-
+# construindo theta_hat e theta_draws
+theta_hat = c( b_hat, h_hat, l_hat )
+theta_draws = chain_b
+theta_draws = rbind( theta_draws, chain_h )
+theta_draws = rbind( theta_draws, chain_l )
 ############### dic deviance information criterion:
 # p( y | theta ) = p( y | b, theta_h, v, h, l) = p( y | b, h, l )
 # theta = b, h, l
 # data = c( y0, y )
 # theta_hat = ( b_hat, h_hat, l_hat )
 # theta_draws = burned_lag
-
 log_lik = function(theta_t, data){
   # função checada (13/04/23)
   T = length( data ) - 1
@@ -326,13 +330,80 @@ dic = function(data, theta_draws, theta_hat){
   
   return( DIC )
 } 
-
-# construindo theta_hat e theta_draws
-theta_hat = c( b_hat, h_hat, l_hat )
-theta_draws = chain_b
-theta_draws = rbind( theta_draws, chain_h )
-theta_draws = rbind( theta_draws, chain_l )
 # calculando DIC
-dic( data = c(y0, y), 
-     theta_draws = theta_draws, 
-     theta_hat )
+svm_ts = dic( data = c(y0, y), 
+              theta_draws = theta_draws, 
+              theta_hat )
+############### loo
+lik = function(data_i, draws, data_, data_past){
+  #data_ = ( y_{1}, y_{2}, ..., y_{T} )
+  #data_past = ( y_{0}, y_{1}, ..., y_{T-1} )
+  k = which( data_ == as.numeric( data_i ) )
+  log_l = NULL
+  N = ncol( draws )
+  T = 0.5 * (nrow( draws ) - 3 )
+  for(col in 1:N){
+    
+    b0_draws = draws[1, col]
+    b1_draws = draws[2, col]
+    b2_draws = draws[3, col]
+    h_draws  = draws[3 + k, col]
+    l_draws  = draws[T + 3 + k, col] 
+    
+    log_l[col] = dnorm(data_i, mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws ), 
+                       sd = exp( 0.5 * h_draws ) / sqrt( l_draws ) )
+    
+  }
+  
+  return( log_l )
+}
+
+r_eff = loo::relative_eff(lik,
+                          chain_id = rep(1, ncol( theta_draws ) ),
+                          data = as.matrix( y ), 
+                          draws = theta_draws,
+                          data_ = y,
+                          data_past = c( y0, y[1:(T-1)] ),
+                          cores = getOption('mc.cores', 3)
+)
+
+# or set r_eff = NA
+loo::loo(lik, 
+         r_eff = NA,
+         #r_eff = r_eff, 
+         data = as.matrix( y ), 
+         draws = theta_draws,
+         data_ = y,
+         data_past = c( y0, y[1:(T-1)] ),
+         cores = getOption('mc.cores', 3)
+)
+############### waic
+log_lik = function(data_i, draws, data_, data_past){
+  #data_ = ( y_{1}, y_{2}, ..., y_{T} )
+  #data_past = ( y_{0}, y_{1}, ..., y_{T-1} )
+  k = which( data_ == as.numeric( data_i ) )
+  log_l = NULL
+  N = ncol( draws )
+  T = 0.5 * (nrow( draws ) - 3 )
+  for(col in 1:N){
+    
+    b0_draws = draws[1, col]
+    b1_draws = draws[2, col]
+    b2_draws = draws[3, col]
+    h_draws  = draws[3 + k, col]
+    l_draws  = draws[T + 3 + k, col] 
+    
+    log_l[col] = dnorm(data_i, mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws ), 
+                       sd = exp( 0.5 * h_draws ) / sqrt( l_draws ), log = TRUE )
+    
+  }
+  
+  return( log_l )
+}
+
+loo::waic(log_lik, 
+          data = matrix( y, ncol = 1 ), 
+          draws = theta_draws,
+          data_ = y,
+          data_past = c( y0, y[1:(T-1)] )
+)
