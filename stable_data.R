@@ -1,5 +1,6 @@
 ############################################################################
 ###################### alpha - stable data
+### read more: https://en.wikipedia.org/wiki/Stable_distribution
 library( stabledist )
 
 mu = -1
