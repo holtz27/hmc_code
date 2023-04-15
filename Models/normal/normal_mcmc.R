@@ -3,7 +3,7 @@
 library(ggplot2)
 Rcpp::sourceCpp('normal_model.cpp')
 
-N = 5e3
+N = 3e4
 samples = svmn(N,
                L_theta = 20, eps_theta = 0.5,
                L_b = 20, eps_b = 0.1,
@@ -18,18 +18,16 @@ samples$acc / N
 chain_theta = samples$chain$chain_theta
 chain_b     = samples$chain$chain_b
 chain_h     = samples$chain$chain_h
-
 # Transformations
 chain_theta[2, ] = tanh( chain_theta[2, ] )
-chain_b[3, ] = exp( chain_b[3, ] )
-chain_h[2, ]     = tanh( chain_h[2, ] )
-
+chain_theta[3, ] = exp( chain_theta[3, ] )
+chain_b[2, ]     = tanh( chain_b[2, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 0
+burn = 1e4
 # Jumps
-lags = 1
+lags = 10
 jumps = seq(1, N - burn, by = lags)
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
@@ -257,17 +255,17 @@ lik = function(data_i, draws, data_, data_past){
 
 r_eff = loo::relative_eff(lik,
                           chain_id = rep(1, ncol( theta_draws ) ),
-                          data = as.matrix( y ), 
+                          data = matrix( y , ncol = 1), 
                           draws = theta_draws,
                           data_ = y,
-                          data_past = c( y0, y[1:(T-1)] ),
-                          cores = getOption('mc.cores', 3)
+                          data_past = c( y0, y[1:(T-1)] )
+                          #cores = getOption('mc.cores', 3)
 )
 
 # or set r_eff = NA
 loo::loo(lik, 
-         r_eff = NA,
-         #r_eff = r_eff, 
+         #r_eff = NA,
+         r_eff = r_eff, 
          data = as.matrix( y ), 
          draws = theta_draws,
          data_ = y,
