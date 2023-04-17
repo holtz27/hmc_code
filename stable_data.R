@@ -1,6 +1,5 @@
 ############################################################################
 ###################### alpha - stable data
-### read more: https://en.wikipedia.org/wiki/Stable_distribution
 library( stabledist )
 
 mu = -1
@@ -38,8 +37,24 @@ for(t in 1:T){
 }
 
 par( mfrow = c( 1, 2) )
-plot( y, type = 'l', main = mean(y) )
+plot( y, type = 'l' )
 hist( y, breaks = 40 )
 par( mfrow = c(1, 1) )
 
+#Descritiva dos log-retornos
+data = matrix(c(mean(y),                   #Média
+                median(y),                 #Mediana
+                sd(y),                     #Desvio padrão
+                moments::skewness(y),      #Assimetria
+                moments::kurtosis(y),      #Curtose
+                min(y),                    #Mínimo
+                max(y) ),                   #Máximo
+              nrow = 1, dimnames = list(row = 'y', col = c('média',
+                                                           'mediana',
+                                                           'sd',
+                                                           'skewnwss',
+                                                           'kurtosis',
+                                                           'min',
+                                                           'max')) )
+data
 
