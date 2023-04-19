@@ -4,14 +4,15 @@ library( ggplot2 )
 Rcpp::sourceCpp( 'ts_model.cpp' )
 
 # Sampling
+# 67092
 N = 5e4
 samples = svm_smn_ts(N,
-                     L_theta = 20, eps_theta = c( 0.5, 0.5, 0.5 ), 
+                     L_theta = 10, eps_theta = c( 0.15, 0.15, 0.15 ), 
                      L_b = 20, eps_b = 0.1, 
                      L_h = 50, eps_h = 0.015,
-                     L_v = 20, eps_v = 0.025, 
+                     L_v = 10, eps_v = 0.025, 
                      y_T = c(y0, y), 
-                     seed = 0 )
+                     seed = 67092 )
 samples$acc / N
 samples$time / 60
 
@@ -32,9 +33,9 @@ chain_v          = exp( chain_e[1, ] )
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
-burn = 2e3
+burn = 0
 # Jumps
-lags = 10
+lags = 1
 jumps = seq(1, N - burn, by = lags)
 
 chain_theta  = chain_theta[, - c( 1:burn ) ] 
@@ -331,7 +332,7 @@ dic = function(data, theta_draws, theta_hat){
   return( DIC )
 } 
 # calculando DIC
-svm_ts = dic( data = c(y0, y), 
+dic_ts = dic( data = c(y0, y), 
               theta_draws = theta_draws, 
               theta_hat )
 ############### loo
@@ -363,20 +364,21 @@ r_eff = loo::relative_eff(lik,
                           data = as.matrix( y ), 
                           draws = theta_draws,
                           data_ = y,
-                          data_past = c( y0, y[1:(T-1)] ),
-                          cores = getOption('mc.cores', 3)
+                          data_past = c( y0, y[1:(T-1)] )
+                          #cores = getOption('mc.cores', 3)
 )
 
 # or set r_eff = NA
-loo::loo(lik, 
-         r_eff = NA,
-         #r_eff = r_eff, 
-         data = as.matrix( y ), 
-         draws = theta_draws,
-         data_ = y,
-         data_past = c( y0, y[1:(T-1)] ),
-         cores = getOption('mc.cores', 3)
+loo_ts = loo::loo(lik, 
+                  #r_eff = NA,
+                  r_eff = r_eff, 
+                  data = as.matrix( y ), 
+                  draws = theta_draws,
+                  data_ = y,
+                  data_past = c( y0, y[1:(T-1)] ),
+                  cores = getOption('mc.cores', 3)
 )
+
 ############### waic
 log_lik = function(data_i, draws, data_, data_past){
   #data_ = ( y_{1}, y_{2}, ..., y_{T} )
@@ -401,9 +403,16 @@ log_lik = function(data_i, draws, data_, data_past){
   return( log_l )
 }
 
-loo::waic(log_lik, 
-          data = matrix( y, ncol = 1 ), 
-          draws = theta_draws,
-          data_ = y,
-          data_past = c( y0, y[1:(T-1)] )
+waic = loo::waic(log_lik, 
+                 data = matrix( y, ncol = 1 ), 
+                 draws = theta_draws,
+                 data_ = y,
+                 data_past = c( y0, y[1:(T-1)] )
 )
+ts_criteruim = matrix( c(dic_ts, 
+                         loo_ts$looic,
+                         waic$waic), nrow = 1)
+
+row.names( ts_criteruim ) = c('ts')
+colnames( ts_criteruim ) = c('dic', 'loo', 'waic')
+ts_criteruim
