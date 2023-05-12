@@ -407,7 +407,7 @@ vec nuH_b(mat dG_b0, mat dG_delta, mat dG_b2, mat inv_G, vec p){
 //vec gradHmom_b(mat inv_G, vec p){
 //    return inv_G * p;
 //}
-vec rmhmc_b(vec b_cur, vec h, vec l, int fixp, int L, double eps, int T, vec y_T , int &acc){
+vec rmhmc_b(vec b_cur, vec h, vec l, int fixp, int L, vec eps, int T, vec y_T , int &acc){
     
     vec theta2p = zeros<vec>(3, 1);
     vec b = zeros<vec>(3, 1);
@@ -449,7 +449,7 @@ vec rmhmc_b(vec b_cur, vec h, vec l, int fixp, int L, double eps, int T, vec y_T
     	gradHMCth2 = gdpth2 - 0.5 * nuH_b(dG_b0, dG_delta, dG_b2, inv_G, pa);
     
     	for(int jfix = 1 ; jfix < fixp + 1 ; jfix++ ){
-    		pb = pa - 0.5 * eps * gradHMCth2;
+    		pb = pa - 0.5 * eps % gradHMCth2;
      		gradHMCth2 = gdpth2 - 0.5 * nuH_b( dG_b0, dG_delta, dG_b2, inv_G, pb);
     	}
     
@@ -458,14 +458,14 @@ vec rmhmc_b(vec b_cur, vec h, vec l, int fixp, int L, double eps, int T, vec y_T
     	gdmom2 = gH_mom( inv_G, pb );
     
     	for(int jfix = 1 ; jfix < fixp + 1 ; jfix++ ){
-    		theta2b = theta2a + 0.5 * eps * gdmom1 + 0.5 * eps * gdmom2;
+    		theta2b = theta2a + 0.5 * eps % gdmom1 + 0.5 * eps % gdmom2;
     		G_b( theta2b, h, l, G, inv_G, dG_b0, dG_delta, dG_b2, T, y_T);
     		gdmom2 = gH_mom( inv_G, pb );
     	}
     
     	gdpth2 = glogpost_b( theta2b, h, l, inv_G, dG_b0, dG_delta, dG_b2, T, y_T );
     	gradHMCth2 = gdpth2 - 0.5 * nuH_b( dG_b0, dG_delta, dG_b2, inv_G, pb);
-    	pb = pb - 0.5 * eps * gradHMCth2;
+    	pb = pb - 0.5 * eps % gradHMCth2;
     	pa = pb;
     	theta2a = theta2b;
     }
