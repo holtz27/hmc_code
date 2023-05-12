@@ -32,7 +32,7 @@ int G_b(vec b, vec h, vec l, mat &G, mat &inv_G, mat& dG_b0, mat &dG_delta, mat 
 vec nuH_b(mat dG_b0, mat dG_delta, mat dG_b2, mat inv_G, vec p);
 //vec gradHmom_b(mat inv_G, vec p);
 // hmc update
-vec rmhmc_b(vec b_cur, vec h, vec l, int fixp, int L, double eps, int T, vec y_T , int &acc);
+vec rmhmc_b(vec b_cur, vec h, vec l, int fixp, int L, vec eps, int T, vec y_T , int &acc);
 
 // v
 // Model functions
