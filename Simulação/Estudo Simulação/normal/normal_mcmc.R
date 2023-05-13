@@ -185,7 +185,6 @@ e.vol_max = apply( exp( chain_h ), MARGIN = 1, FUN = quantile, probs = c(0.975) 
 data = matrix(c(1:T, abs(y), e.vol_hat, e.vol_min, e.vol_max), ncol = 5)
 data = data.frame(data)
 names(data) = c('obs', 'y.abs', 'e.hat', 'e.min','e.max')
-
 h = ggplot(data)
 h = h + geom_line(aes(obs, y.abs), color = 'grey70')
 h = h + geom_ribbon(aes(x = 1:T, ymax = e.vol_max, ymin = e.vol_min), 
