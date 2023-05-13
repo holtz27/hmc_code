@@ -1,33 +1,9 @@
 ################################################################################
 #### librarys
 library( ggplot2 )
-# getwd()
-path = 'C:/Users/8936381/Documents/Simulacao/Estudos_Simulacao/ts/ts_model.cpp'
-Rcpp::sourceCpp( path )
-
-# Sampling
-# 67092,  N = 5e3: cadeia corre
-# 439675, N = 5e3
-# L_theta = 30, eps_theta = c( 0.5, 0.3, 1.0 ): cadeia corre
-
-### theta 
-# mu: L * eps = 15
-# phi: L * eps = 15
-# sigma: L * eps = 3
-
-N = 5e3
-samples = svm_smn_ts(N,
-                     L_theta = 30, eps_theta = c( 0.5, 0.5, 0.75 ), 
-                     L_b = 30, eps_b = c( 0.1, 0.1, 0.1 ), 
-                     L_h = 50, eps_h = 0.015,
-                     L_v = 20, eps_v = 0.05, 
-                     y_T = c(0, y), 
-                     seed = 67092 )
-samples$time / 60
-samples$acc / N
 ################## Save outputs
-#save(samples, file = 'C:/Users/8936381/Documents/Simulacao/ts/ts_samples.RDara')
-#load('C:/Users/8936381/Documents/Modelos/ts/ts_samples.RDara')
+load('C:/Users/8936381/Documents/Seleção Modelos/SM_ts.RDara')
+
 chain_theta = samples$chain$chain_theta
 chain_b = samples$chain$chain_b
 chain_h = samples$chain$chain_h
@@ -38,6 +14,9 @@ chain_theta[2, ] = tanh( chain_theta[2, ] )
 chain_theta[3, ] = exp( chain_theta[3, ] )
 chain_b[2, ]     = tanh( chain_b[2, ] )
 chain_v          = exp( chain_e[1, ] )
+N = dim(chain_theta)[2] - 1
+samples$time / 60
+samples$acc / N
 ############################### Convergence analysis
 ################### Trace plots
 ### burn
@@ -49,7 +28,7 @@ chain_e     = chain_e[ - c( 1:burn ) ]
 chain_v     = chain_v[ - c( 1:burn ) ]
 chain_l     = chain_l[, - c( 1:burn ) ] 
 # Jumps
-lags = 20
+lags = 40
 jumps = seq(1, N - burn, by = lags)
 chain_theta = chain_theta[, jumps ]
 chain_b     = chain_b[, jumps ]
@@ -67,33 +46,33 @@ layout( mat )
 plot(chain_theta[1, ], type = 'l', main = 'mu', xlab = '', ylab = '')
 plot(acf(chain_theta[1, ], lag.max = 200, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_theta[1, ],  main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_theta[1, ]), main = '', xlab = '', ylab = '' )
 plot(chain_theta[2, ], type = 'l', main = 'phi', xlab = '', ylab = '')
 plot(acf(chain_theta[2, ], lag.max = 200, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_theta[2, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_theta[2, ]), main = '', xlab = '', ylab = '' )
 plot(chain_theta[3, ], type = 'l',  main = 'sigma', xlab = '', ylab = '')
 plot(acf(chain_theta[3, ], lag.max = 200, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_theta[3, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_theta[3, ]), main = '', xlab = '', ylab = '' )
 ############################### b
 plot(chain_b[1, ], type = 'l', main = 'b0', xlab = '', ylab = '')
 plot(acf(chain_b[1, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_b[1, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_b[1, ]), main = '', xlab = '', ylab = '' )
 plot(chain_b[2, ], type = 'l', main = 'b1', xlab = '', ylab = '')
 plot(acf(chain_b[2, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_b[2, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_b[2, ]), main = '', xlab = '', ylab = '' )
 plot(chain_b[3, ], type = 'l', main = 'b2', xlab = '', ylab = '')
 plot(acf(chain_b[3, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_b[3, ], main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_b[3, ]), main = '', xlab = '', ylab = '' )
 ############################### e = log( v )
 plot(chain_e, type = 'l', main = 'e = log( v )', xlab = '', ylab = '')
 plot(acf(chain_e, lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
-hist(chain_e, main = '', xlab = '', ylab = '', breaks = 40)
+plot(density(chain_e), main = '', xlab = '', ylab = '' )
 ############### Numeric Analysis
 ############################### theta
 mcmcchain_theta = coda::as.mcmc( t( chain_theta ) )
@@ -193,20 +172,19 @@ data
 ###############################################################################
 ############################### l
 l_hat = apply(chain_l, MARGIN = 1, FUN = mean)
-l_min = apply(chain_l, MARGIN = 1, FUN = quantile, probs = c(0.025) )
-l_max = apply(chain_l, MARGIN = 1, FUN = quantile, probs = c(0.975) )
-data2 = matrix(c(1:T, l, l_hat, l_min, l_max), ncol = 5)
-data2 = data.frame(data2)
-names(data2) = c('obs', 'vdd', 'media', 'min', 'max')
+#l_min = apply(chain_l, MARGIN = 1, FUN = quantile, probs = c(0.025) )
+#l_max = apply(chain_l, MARGIN = 1, FUN = quantile, probs = c(0.975) )
+#data2 = matrix(c(1:T, l_hat, l_min, l_max), ncol = 5)
+#data2 = data.frame(data2)
+#names(data2) = c('obs', 'media', 'min', 'max')
 # plot1
-a = sample(1:(T - 101), 1)
-f = ggplot(data2[a:(a + 100), ])
+#a = sample(1:(T - 101), 1)
+#f = ggplot(data2[a:(a + 100), ])
 #f = ggplot(data2)
-f = f + geom_line(aes(obs, media))
-f = f + geom_line(aes(obs, vdd), color = 'red')
-f = f + geom_line(aes(obs, min), linetype = 'dashed')
-f = f + geom_line(aes(obs, max), linetype = 'dashed')
-f
+#f = f + geom_line(aes(obs, media))
+#f = f + geom_line(aes(obs, min), linetype = 'dashed')
+#f = f + geom_line(aes(obs, max), linetype = 'dashed')
+#f
 ############### Numeric Analysis
 mcmcchain_l = coda::as.mcmc( t( chain_l ) ) 
 ####### Geweke Statistic
@@ -226,32 +204,30 @@ mc_error_l = round( apply( chain_l,
                            MARGIN = 1, 
                            FUN = sd) / sqrt( N_eff_l ), 5 )
 # plots
-par( mfrow = c(1,3) )
+mat = matrix(c(1,1,1,2,3,4), nrow = 2, byrow = TRUE)
+layout( mat )
+plot(l_hat, type = 'l', xlab = 'Tempo', ylab = '')
 plot( CD_l$z, main = 'Geweke diagnostic', xlab = '', ylab = '' )
-abline(h = -1.96)
-abline(h = 1.96)
+abline(h = -1.96, lty = 2, lwd = 2, col = 'blue')
+abline(h = 1.96, lty = 2, lwd = 2, col = 'blue')
 plot( IF_l, main = 'Inefficiency factors', xlab = '', ylab = '' )
-abline(h = 1)
 plot( mc_error_l, main = 'MCMC errors', xlab = '', ylab = '' )
-par( mfrow = c(1,1) )
 ###############################################################################
 ###############################################################################
-############################### h
-h_hat = apply(chain_h, MARGIN = 1, FUN = mean)
-h_min = apply(chain_h, MARGIN = 1, FUN = quantile, probs = c(0.025) )
-h_max = apply(chain_h, MARGIN = 1, FUN = quantile, probs = c(0.975) )
-data = matrix(c(1:T, h, h_hat, h_min, h_max), ncol = 5)
+############################### exp( h )
+e.vol_hat = apply( exp( chain_h ), MARGIN = 1, FUN = mean )
+e.vol_min = apply( exp( chain_h ), MARGIN = 1, FUN = quantile, probs = c(0.025) )
+e.vol_max = apply( exp( chain_h ), MARGIN = 1, FUN = quantile, probs = c(0.975) )
+data = matrix(c(1:T, abs(y), e.vol_hat, e.vol_min, e.vol_max), ncol = 5)
 data = data.frame(data)
-names(data) = c('obs', 'vdd', 'media', 'min','max')
-#plots
-#a = sample(1:(T - 1001), 1)
-#g = ggplot(data[ a:(1000 + a), ])
-g = ggplot(data)
-g = g + geom_line(aes(obs, media))
-g = g + geom_line(aes(obs, vdd), color = 'red')
-g = g + geom_line(aes(obs, min), linetype = 'dashed')
-g = g + geom_line(aes(obs, max), linetype = 'dashed')
-g
+names(data) = c('obs', 'y.abs', 'e.hat', 'e.min','e.max')
+h = ggplot(data)
+h = h + geom_line(aes(obs, y.abs), color = 'grey60')
+h = h + geom_ribbon(aes(x = 1:T, ymax = e.vol_max, ymin = e.vol_min), 
+                    fill = 'blue' ,alpha = 0.2)
+h = h + geom_line(aes(obs, e.hat), linewidth = 0.75)
+h = h + theme_test() + xlab('Tempo') + ylab('|retornos|')
+h
 ############### Numeric Analysis
 mcmcchain_h = coda::as.mcmc( t( chain_h ) ) 
 ####### Geweke Statistic
@@ -284,6 +260,7 @@ par( mfrow = c(1,1) )
 ###############################################################################
 ############################## Model Selection
 # construindo theta_hat e theta_draws
+h_hat = apply(chain_h, MARGIN = 1, FUN = mean)
 theta_hat = c( b_hat, h_hat, l_hat )
 theta_draws = chain_b
 theta_draws = rbind( theta_draws, chain_h )
@@ -325,7 +302,7 @@ dic = function(data, theta_draws, theta_hat){
   return( DIC )
 } 
 # calculando DIC
-dic_ts = dic( data = c(y0, y), 
+dic_ts = dic( data = c(0, y), 
               theta_draws = theta_draws, 
               theta_hat )
 ############### loo
