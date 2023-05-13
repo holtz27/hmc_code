@@ -1,6 +1,7 @@
 ################################################################################
 #### librarys
 library(ggplot2)
+library(patchwork)
 path = 'C:/Users/8936381/Documents/Simulacao/Estudos_Simulacao/normal/normal_model.cpp'
 Rcpp::sourceCpp( path )
 
@@ -16,7 +17,7 @@ samples$time / 60
 samples$acc / N
 ################## Save outputs
 #save(samples, file = 'C:/Users/8936381/Documents/Simulacao/Estudos_Simulacao/normal/ES.RDara')
-load('C:/Users/8936381/Documents/Simulacao/Estudos_Simulacao/normal/ES.RDara')
+load('C:/Users/8936381/Documents/Simulacao/Estudo_Simulacao/normal/normal_ES.RDara')
 chain_theta = samples$chain$chain_theta
 chain_b     = samples$chain$chain_b
 chain_h     = samples$chain$chain_h
@@ -145,14 +146,19 @@ data = data.frame(data)
 names(data) = c('obs', 'vdd', 'media', 'min','max')
 #names(data) = c('obs', 'media', 'min','max')
 #plots
-#a = sample(1:(T - 151), 1)
-#g = ggplot(data[ a:(250 + a), ])
-g = ggplot(data)
-g = g + geom_line(aes(obs, media))
-g = g + geom_line(aes(obs, vdd), color = 'red')
-g = g + geom_line(aes(obs, min), linetype = 'dashed')
-g = g + geom_line(aes(obs, max), linetype = 'dashed')
-g
+g1 = ggplot(data[ 1:1000, ])
+g1 = g1 + geom_line(aes(obs, media))
+g1 = g1 + geom_line(aes(obs, vdd), color = 'red')
+g1 = g1 + geom_line(aes(obs, min), linetype = 'dashed')
+g1 = g1 + geom_line(aes(obs, max), linetype = 'dashed')
+g1 = g1 + theme_test()
+g2 = ggplot(data[ 1001:2000, ])
+g2 = g2 + geom_line(aes(obs, media))
+g2 = g2 + geom_line(aes(obs, vdd), color = 'red')
+g2 = g2 + geom_line(aes(obs, min), linetype = 'dashed')
+g2 = g2 + geom_line(aes(obs, max), linetype = 'dashed')
+g2 = g2 + theme_test()
+g1 / g2
 ############### Numeric Analysis
 mcmcchain_h = coda::as.mcmc( t( chain_h ) ) 
 ####### Geweke Statistic
@@ -172,7 +178,22 @@ mc_error_h = round( apply( chain_h,
                            MARGIN = 1, 
                            FUN = sd) / sqrt( N_eff_h ), 
                     5 )
-# plots
+# other plots
+e.vol_hat = apply( exp( chain_h ), MARGIN = 1, FUN = mean )
+e.vol_min = apply( exp( chain_h ), MARGIN = 1, FUN = quantile, probs = c(0.025) )
+e.vol_max = apply( exp( chain_h ), MARGIN = 1, FUN = quantile, probs = c(0.975) )
+data = matrix(c(1:T, abs(y), e.vol_hat, e.vol_min, e.vol_max), ncol = 5)
+data = data.frame(data)
+names(data) = c('obs', 'y.abs', 'e.hat', 'e.min','e.max')
+
+h = ggplot(data)
+h = h + geom_line(aes(obs, y.abs), color = 'grey70')
+h = h + geom_ribbon(aes(x = 1:T, ymax = e.vol_max, ymin = e.vol_min), 
+                    fill = 'blue' ,alpha = 0.2)
+h = h + geom_line(aes(obs, e.hat), linewidth = 0.75)
+h = h + theme_test() + xlab('Tempo') + ylab('|retornos|')
+h
+# convergence plots
 par( mfrow = c(1,3) )
 plot( CD_h$z, main = 'Geweke diagnostic', xlab = '', ylab = '' )
 abline(h = -1.96)
@@ -248,7 +269,7 @@ lik = function(data_i, draws, data_, data_past){
     
     log_l[col] = dnorm(data_i, mean = b0_draws + b1_draws * data_past[k] + b2_draws * exp( h_draws ), 
                        sd = exp( 0.5 * h_draws ) )
-                       
+    
   }
   
   return( log_l )
@@ -272,7 +293,7 @@ loo_normal = loo::loo(lik,
                       data_ = y,
                       data_past = c( y0, y[1:(T-1)] ),
                       cores = getOption('mc.cores', 3)
-                      )
+)
 
 ############### waic
 log_lik = function(data_i, draws, data_, data_past){
@@ -302,11 +323,11 @@ waic_normal = loo::waic(log_lik,
                         draws = theta_draws,
                         data_ = y,
                         data_past = c( y0, y[1:(T-1)] )
-                        )
+)
 
 normal_criterium = matrix( c(dic_normal, 
-                            loo_normal$looic,
-                            waic_normal$waic), nrow = 1)
+                             loo_normal$looic,
+                             waic_normal$waic), nrow = 1)
 row.names( normal_criterium ) = c('normal')
 colnames( normal_criterium ) = c('dic', 'loo', 'waic')
 normal_criterium
