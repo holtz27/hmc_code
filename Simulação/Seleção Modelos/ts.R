@@ -44,15 +44,15 @@ mat = matrix(seq(1, 21), nrow = 3, ncol = 7)
 layout( mat )
 ############################### theta
 plot(chain_theta[1, ], type = 'l', main = 'mu', xlab = '', ylab = '')
-plot(acf(chain_theta[1, ], lag.max = 200, plot = FALSE)[1:100], main = '', 
+plot(acf(chain_theta[1, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
 plot(density(chain_theta[1, ]), main = '', xlab = '', ylab = '' )
 plot(chain_theta[2, ], type = 'l', main = 'phi', xlab = '', ylab = '')
-plot(acf(chain_theta[2, ], lag.max = 200, plot = FALSE)[1:100], main = '', 
+plot(acf(chain_theta[2, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
 plot(density(chain_theta[2, ]), main = '', xlab = '', ylab = '' )
 plot(chain_theta[3, ], type = 'l',  main = 'sigma', xlab = '', ylab = '')
-plot(acf(chain_theta[3, ], lag.max = 200, plot = FALSE)[1:100], main = '', 
+plot(acf(chain_theta[3, ], lag.max = 100, plot = FALSE)[1:100], main = '', 
      xlab = '', ylab = '')
 plot(density(chain_theta[3, ]), main = '', xlab = '', ylab = '' )
 ############################### b
